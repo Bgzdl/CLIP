@@ -168,6 +168,33 @@ class QuickGELU(nn.Module):
         return x * torch.sigmoid(1.702 * x)
 
 
+class FeedforwardAdapter(nn.Module):
+    def __init__(self, input_dim, hidden_dim=64, init_scale=1e-3):
+        super(FeedforwardAdapter, self).__init__()
+
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, input_dim)
+
+        # Initialize weights and biases
+        self.fc1.weight.data.normal_(0, init_scale)
+        self.fc2.weight.data.normal_(0, init_scale)
+        self.fc1.bias.data.fill_(0)
+        self.fc2.bias.data.fill_(0)
+
+    def forward(self, x):
+        # First linear transformation
+        net = self.fc1(x)
+        net = F.gelu(net)  # Apply GELU activation
+
+        # Second linear transformation
+        net = self.fc2(net)
+
+        # Residual connection
+        net += x
+
+        return net
+
+
 class ResidualAttentionBlock(nn.Module):
     def __init__(self, d_model: int, n_head: int, attn_mask: torch.Tensor = None):
         super().__init__()
@@ -192,6 +219,27 @@ class ResidualAttentionBlock(nn.Module):
         return x
 
 
+class AdapterResidualAttentionBlock(nn.Module):
+    def __init__(self, origin_model: ResidualAttentionBlock):
+        super().__init__()
+        self.pretrained_model = origin_model
+        for param in self.pretrained_model.parameters():
+            param.requires_grad = False
+        self.attn_mask = origin_model.attn_mask
+        self.adapter_layer = FeedforwardAdapter(768)
+
+    def attention(self, x: torch.Tensor):
+        self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
+        return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
+
+    def forward(self, x: torch.Tensor):
+        x = x + self.pretrained_model.attention(self.ln_1(x))
+        x = self.adapter_layer(x)
+        x = x + self.pretrained_model.mlp(self.ln_2(x))
+        x = self.adapter_layer(x)
+        return x
+
+
 class Transformer(nn.Module):
     def __init__(self, width: int, layers: int, heads: int, attn_mask: torch.Tensor = None):
         super().__init__()
@@ -201,6 +249,20 @@ class Transformer(nn.Module):
 
     def forward(self, x: torch.Tensor):
         return self.resblocks(x)
+
+
+class AdapterTransformer(nn.Module):
+    def __init__(self, origin_model: Transformer):
+        super().__init__()
+        self.width = origin_model.width
+        self.layers = origin_model.layers
+        adapter_Resblocks = []
+        for block in origin_model.resblocks:
+            adapter_Resblocks.append(AdapterResidualAttentionBlock(block))
+        self.adapter_resblocks = nn.Sequential(*adapter_Resblocks)
+
+    def forward(self, x: torch.Tensor):
+        return self.adapter_resblocks(x)
 
 
 class VisionTransformer(nn.Module):
@@ -224,7 +286,48 @@ class VisionTransformer(nn.Module):
         x = self.conv1(x)  # shape = [*, width, grid, grid]
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
-        x = torch.cat([self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x], dim=1)  # shape = [*, grid ** 2 + 1, width]
+        x = torch.cat(
+            [self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device),
+             x], dim=1)  # shape = [*, grid ** 2 + 1, width]
+        x = x + self.positional_embedding.to(x.dtype)
+        x = self.ln_pre(x)
+
+        x = x.permute(1, 0, 2)  # NLD -> LND
+        x = self.transformer(x)
+        x = x.permute(1, 0, 2)  # LND -> NLD
+
+        x = self.ln_post(x[:, 0, :])
+
+        if self.proj is not None:
+            x = x @ self.proj
+
+        return x
+
+
+class AdapterVisionTransformer(nn.Module):
+    def __init__(self, input_resolution: int, patch_size: int, width: int, layers: int, heads: int, output_dim: int):
+        super().__init__()
+        self.input_resolution = input_resolution
+        self.output_dim = output_dim
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=width, kernel_size=patch_size, stride=patch_size, bias=False)
+
+        scale = width ** -0.5
+        self.class_embedding = nn.Parameter(scale * torch.randn(width))
+        self.positional_embedding = nn.Parameter(scale * torch.randn((input_resolution // patch_size) ** 2 + 1, width))
+        self.ln_pre = LayerNorm(width)
+
+        self.transformer = AdapterTransformer(Transformer(width, layers, heads))
+
+        self.ln_post = LayerNorm(width)
+        self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
+
+    def forward(self, x: torch.Tensor):
+        x = self.conv1(x)  # shape = [*, width, grid, grid]
+        x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
+        x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
+        x = torch.cat(
+            [self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device),
+             x], dim=1)  # shape = [*, grid ** 2 + 1, width]
         x = x + self.positional_embedding.to(x.dtype)
         x = self.ln_pre(x)
 
@@ -256,6 +359,20 @@ class CLIP(nn.Module):
                  transformer_layers: int
                  ):
         super().__init__()
+
+        # 参数保存
+        self.embed_dim = embed_dim
+        # vision
+        self.image_resolution = image_resolution
+        self.vision_layers = vision_layers
+        self.vision_width = vision_width
+        self.vision_patch_size = vision_patch_size
+        # text
+        self.context_length = context_length
+        self.vocab_size = vocab_size
+        self.transformer_width = transformer_width
+        self.transformer_heads = transformer_heads
+        self.transformer_layers = transformer_layers
 
         self.context_length = context_length
 
@@ -372,6 +489,27 @@ class CLIP(nn.Module):
         return logits_per_image, logits_per_text
 
 
+class Adapter_CLIP(CLIP):
+    def __init__(self, model: CLIP):
+        super().__init__(model.embed_dim,
+                         # visual
+                         model.image_resolution,
+                         model.vision_layers,
+                         model.width,
+                         model.vision_patch_size,
+                         # text
+                         model.context_length,
+                         model.vocab_size,
+                         model.transformer_width,
+                         model.transformer_heads,
+                         model.transformer_layers,
+                         )
+        new_model = nn.Sequential()
+        for block in self.visual.transformer.resblocks:
+            new_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
+        self.visual.transformer.resblocks = new_model
+
+
 def convert_weights(model: nn.Module):
     """Convert applicable model parameters to fp16"""
 
@@ -401,12 +539,14 @@ def build_model(state_dict: dict):
 
     if vit:
         vision_width = state_dict["visual.conv1.weight"].shape[0]
-        vision_layers = len([k for k in state_dict.keys() if k.startswith("visual.") and k.endswith(".attn.in_proj_weight")])
+        vision_layers = len(
+            [k for k in state_dict.keys() if k.startswith("visual.") and k.endswith(".attn.in_proj_weight")])
         vision_patch_size = state_dict["visual.conv1.weight"].shape[-1]
         grid_size = round((state_dict["visual.positional_embedding"].shape[0] - 1) ** 0.5)
         image_resolution = vision_patch_size * grid_size
     else:
-        counts: list = [len(set(k.split(".")[2] for k in state_dict if k.startswith(f"visual.layer{b}"))) for b in [1, 2, 3, 4]]
+        counts: list = [len(set(k.split(".")[2] for k in state_dict if k.startswith(f"visual.layer{b}"))) for b in
+                        [1, 2, 3, 4]]
         vision_layers = tuple(counts)
         vision_width = state_dict["visual.layer1.0.conv1.weight"].shape[0]
         output_width = round((state_dict["visual.attnpool.positional_embedding"].shape[0] - 1) ** 0.5)
