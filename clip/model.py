@@ -495,7 +495,7 @@ class Adapter_CLIP(CLIP):
                          # visual
                          model.image_resolution,
                          model.vision_layers,
-                         model.width,
+                         model.vision_width,
                          model.vision_patch_size,
                          # text
                          model.context_length,
