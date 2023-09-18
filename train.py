@@ -18,9 +18,9 @@ class InfoNCE_loss(nn.Module):
 
     def forward(self, predict, target):
         # joint multimodal embedding [n, d_e]
-        predict_projection = torch.tensor(np.dot(predict, self.W_i))
+        predict_projection = torch.tensor(torch.dot(predict, self.W_i))
         predict_e = predict_projection / torch.norm(predict_projection, p=2, dim=1, keepdim=True)
-        target_projection = torch.tensor(np.dot(target, self.W_t))
+        target_projection = torch.tensor(torch.dot(target, self.W_t))
         target_e = target_projection / torch.norm(target_projection, p=2, dim=1, keepdim=True)
 
         # scaled pairwise cosine similarities [n, n]
@@ -36,22 +36,29 @@ class InfoNCE_loss(nn.Module):
 
 
 # 模型准备
-origin_model, transform = clip.load('ViT-B/16')
-model = Adapter_CLIP(origin_model)
+model, transform = clip.load('ViT-B/16')
+print(transform)
+# model = Adapter_CLIP(model)
 model.to('cuda')
 infonce_loss = InfoNCE_loss(model.visual.proj, model.text_projection, 0.5)
+infonce_loss = infonce_loss.cuda()
 # 优化器
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 # 数据集
+print('preparing dataset')
 dataset = Patch('data', False, transform)
 dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
-
+print('finish')
 epoches = 30
 for epoch in range(epoches):
     print(epoch)
     running_loss = 0.0
     for dictionary in dataloader:
-        I_f, T_f = dictionary['data'], dictionary['target']
+        I, T = dictionary['data'], dictionary['target']
+        I = torch.tensor(np.stack(I)).cuda()
+        T = clip.tokenize([desc for desc in T]).cuda()
+        I_f = model.encode_image(I)
+        T_f = model.encode_text(T)
         optimizer.zero_grad()
         loss = infonce_loss(I_f, T_f)
         loss.backward()
