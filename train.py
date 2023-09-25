@@ -39,9 +39,10 @@ def train(model, dataloader, criterion, optimizer):
         I, T = dictionary['data'], dictionary['target']
         I = torch.tensor(np.stack(I)).cuda()
         T = clip.tokenize([desc for desc in T]).cuda()
+        print(T.shape)
         I_f = model.encode_image(I)
         T_f = model.encode_text(T)
-        loss = infonce_loss(I_f, T_f)
+        loss = criterion(I_f, T_f)
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
@@ -89,36 +90,32 @@ def evaluate(model, dataloader):
     return correct / total
 
 
-for i in range(2):
-    # 模型准备
-    model, transform = clip.load('ViT-B/16')
-    print(transform)
-    model = Adapter_CLIP(model)
-    model.to('cuda')
-    if i == 0:
-        temperature = 0.5
-    elif i == 1:
-        temperature = 0.1
-    infonce_loss = InfoNCE_loss(model.visual.proj, model.text_projection, temperature)
-    infonce_loss = infonce_loss.cuda()
-    print('temperature is ', temperature)
-    # 数据集
-    print('preparing dataset')
-    dataset = Patch('data', True, transform)
-    count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
-    print('Quantity of various categories is', count_0, count_1, count_2)
-    train_dataset, val_dataset, test_dataset = dataset.split()
-    train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=128, shuffle=True)
-    print('finish')
-    # 优化器
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
-    epoches = 30
+# 模型准备
+model, transform = clip.load('ViT-B/16')
+print(transform)
+model = Adapter_CLIP(model)
+model.to('cuda')
+temperature = 0.01
+infonce_loss = InfoNCE_loss(model.visual.proj, model.text_projection, temperature)
+infonce_loss = infonce_loss.cuda()
+print('temperature is ', temperature)
+# 数据集
+print('preparing dataset')
+dataset = Patch('data', True, transform, True)
+count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
+print('Quantity of various categories is', count_0, count_1, count_2)
+train_dataset, val_dataset, test_dataset = dataset.split()
+train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=128, shuffle=True)
+print('finish')
+# 优化器
+optimizer = optim.Adam(model.parameters(), lr=0.0001)
+epoches = 30
 
-    for epoch in range(epoches):
-        torch.cuda.empty_cache()
-        print(epoch)
-        train_loss = train(model, train_dataloader, infonce_loss, optimizer)
-        print('train loss is ', train_loss)
-        acc = evaluate(model, val_dataloader)
-        print('acc is ', acc)
+for epoch in range(epoches):
+    torch.cuda.empty_cache()
+    print(epoch)
+    train_loss = train(model, train_dataloader, infonce_loss, optimizer)
+    print('train loss is ', train_loss)
+    acc = evaluate(model, val_dataloader)
+    print('acc is ', acc)
