@@ -60,8 +60,6 @@ class Patch(Dataset):
     def load_img_path(self):
         # 读取图片路径并存在list里
         for i, [_, d] in enumerate(self.data_information.iterrows()):
-            if i > 300:
-                continue
             text = d['subtype']
             if text in label_dict.keys():
                 if ',' in text:
@@ -80,8 +78,6 @@ class Patch(Dataset):
     def preprocess(self):
         # 读取数据并存在list里
         for i, [_, d] in enumerate(self.data_information.iterrows()):
-            if i > 300:
-                continue
             text = d['subtype']
             if text in label_dict.keys():
                 if ',' in text:
