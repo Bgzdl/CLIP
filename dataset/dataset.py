@@ -11,12 +11,26 @@ label_dict = {'Well differentiated tubular adenocarcinoma': 0,
               'Poorly differentiated adenocarcinoma, solid type': 2}
 
 
+class sub_Patch(Dataset):
+    def __init__(self, data, target, label):
+        self.data = data
+        self.target = target
+        self.label = label
+
+    def __getitem__(self, idx):
+        return {'data': self.data[idx], 'target': self.target[idx], 'label': self.label[idx]}
+
+    def __len__(self):
+        return len(self.data)
+
+
 class Patch(Dataset):
     def __init__(self, path, label_type: bool, transform=None):
         self.data_information = pd.read_csv(os.path.join(path, 'captions.csv'))
         self.label_type = label_type
         self.length = 0
         self.data = []
+        self.target = []
         self.label = []
         self.path = path
         self.transform = transform
@@ -25,7 +39,7 @@ class Patch(Dataset):
     def read(self):
         # 读取数据并存在list里
         for i, [_, d] in enumerate(self.data_information.iterrows()):
-            if i > 50:
+            if i > 300:
                 continue
             text = d['subtype']
             if text in label_dict.keys():
@@ -39,13 +53,31 @@ class Patch(Dataset):
                         if self.transform is not None:
                             image = self.transform(image)
                         self.data.append(image)
+                        self.label.append(label_dict[d['subtype']])
                         if self.label_type:
-                            self.label.append(text)
+                            self.target.append(text)
                         else:
-                            self.label.append(d['text'])
+                            self.target.append(d['text'])
 
     def __getitem__(self, idx):
-        return {'data': self.data[idx], 'target': self.label[idx]}
+        return {'data': self.data[idx], 'target': self.target[idx], 'label': self.label[idx]}
 
     def __len__(self):
         return len(self.data)
+
+    def split(self):
+        length = len(self.data)
+        train = sub_Patch(self.data[:int(length * 0.8)], self.target[:int(length * 0.8)],
+                          self.label[:int(length * 0.8)])
+        val = sub_Patch(self.data[int(length * 0.8):int(length * 0.98)],
+                        self.target[int(length * 0.8):int(length * 0.98)],
+                        self.label[int(length * 0.8):int(length * 0.98)])
+        test = sub_Patch(self.data[int(length * 0.98):], self.target[int(length * 0.98):],
+                         self.label[int(length * 0.98):])
+        return [train, val, test]
+
+    def Count_the_number_of_various_tags(self):
+        count_0 = self.label.count(0)
+        count_1 = self.label.count(1)
+        count_2 = self.label.count(2)
+        return [count_0, count_1, count_2]

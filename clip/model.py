@@ -198,6 +198,7 @@ class FeedforwardAdapter(nn.Module):
 class ResidualAttentionBlock(nn.Module):
     def __init__(self, d_model: int, n_head: int, attn_mask: torch.Tensor = None):
         super().__init__()
+        self.d_model = d_model
 
         self.attn = nn.MultiheadAttention(d_model, n_head)
         self.ln_1 = LayerNorm(d_model)
@@ -223,20 +224,28 @@ class AdapterResidualAttentionBlock(nn.Module):
     def __init__(self, origin_model: ResidualAttentionBlock):
         super().__init__()
         self.pretrained_model = origin_model
+        d_model = origin_model.d_model
         for param in self.pretrained_model.parameters():
             param.requires_grad = False
         self.attn_mask = origin_model.attn_mask
-        self.adapter_layer = FeedforwardAdapter(768)
+        self.adapter_layer_1 = FeedforwardAdapter(d_model)
+        for param in self.adapter_layer_1.parameters():
+            param.requires_grad = True
+        self.adapter_layer_2 = FeedforwardAdapter(d_model)
+        for param in self.adapter_layer_2.parameters():
+            param.requires_grad = True
+        self.ln_3 = LayerNorm(d_model)
 
     def attention(self, x: torch.Tensor):
         self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
         return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
 
     def forward(self, x: torch.Tensor):
-        x = x + self.pretrained_model.attention(self.ln_1(x))
-        x = self.adapter_layer(x)
-        x = x + self.pretrained_model.mlp(self.ln_2(x))
-        x = self.adapter_layer(x)
+        x = x + self.pretrained_model.attention(self.pretrained_model.ln_1(x))
+        x = self.adapter_layer_1(x)
+        x = x + self.pretrained_model.mlp(self.pretrained_model.ln_2(x))
+        x = self.adapter_layer_2(x)
+        x = self.ln_3(x)
         return x
 
 
@@ -278,45 +287,6 @@ class VisionTransformer(nn.Module):
         self.ln_pre = LayerNorm(width)
 
         self.transformer = Transformer(width, layers, heads)
-
-        self.ln_post = LayerNorm(width)
-        self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
-
-    def forward(self, x: torch.Tensor):
-        x = self.conv1(x)  # shape = [*, width, grid, grid]
-        x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
-        x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
-        x = torch.cat(
-            [self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device),
-             x], dim=1)  # shape = [*, grid ** 2 + 1, width]
-        x = x + self.positional_embedding.to(x.dtype)
-        x = self.ln_pre(x)
-
-        x = x.permute(1, 0, 2)  # NLD -> LND
-        x = self.transformer(x)
-        x = x.permute(1, 0, 2)  # LND -> NLD
-
-        x = self.ln_post(x[:, 0, :])
-
-        if self.proj is not None:
-            x = x @ self.proj
-
-        return x
-
-
-class AdapterVisionTransformer(nn.Module):
-    def __init__(self, input_resolution: int, patch_size: int, width: int, layers: int, heads: int, output_dim: int):
-        super().__init__()
-        self.input_resolution = input_resolution
-        self.output_dim = output_dim
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=width, kernel_size=patch_size, stride=patch_size, bias=False)
-
-        scale = width ** -0.5
-        self.class_embedding = nn.Parameter(scale * torch.randn(width))
-        self.positional_embedding = nn.Parameter(scale * torch.randn((input_resolution // patch_size) ** 2 + 1, width))
-        self.ln_pre = LayerNorm(width)
-
-        self.transformer = AdapterTransformer(Transformer(width, layers, heads))
 
         self.ln_post = LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
@@ -504,6 +474,8 @@ class Adapter_CLIP(CLIP):
                          model.transformer_heads,
                          model.transformer_layers,
                          )
+        for param in model.parameters():
+            param.requires_grad = False
         new_model = nn.Sequential()
         for block in self.visual.transformer.resblocks:
             new_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
