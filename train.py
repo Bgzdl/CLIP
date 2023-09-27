@@ -39,7 +39,6 @@ def train(model, dataloader, criterion, optimizer):
         I, T = dictionary['data'], dictionary['target']
         I = torch.tensor(np.stack(I)).cuda()
         T = clip.tokenize([desc for desc in T]).cuda()
-        print(T.shape)
         I_f = model.encode_image(I)
         T_f = model.encode_text(T)
         loss = criterion(I_f, T_f)
