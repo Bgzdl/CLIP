@@ -97,7 +97,7 @@ infonce_loss = infonce_loss.cuda()
 print('temperature is ', temperature)
 # 数据集
 print('preparing dataset')
-dataset = Patch('data', True, transform, load=False)
+dataset = Patch('data', True, transform, load=False)# '/root/autodl-tmp/patch' in autodl
 count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
 print('Quantity of various categories is', count_0, count_1, count_2)
 train_dataset, val_dataset, test_dataset = dataset.split()
