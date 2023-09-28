@@ -482,6 +482,43 @@ class Adapter_CLIP(CLIP):
         self.visual.transformer.resblocks = new_model
 
 
+class LoRA(nn.Module):
+    def __init__(self, input_dim, output_dim, r):
+        super().__init__()
+        self.r = r
+        self.A = nn.Linear(r, output_dim)
+        self.B = nn.Linear(input_dim, r)
+        nn.init.normal_(self.A.weight, mean=0, std=0.01)
+        nn.init.constant(self.A.bias, val=0)
+        nn.init.zeros_(self.B.weight)
+        nn.init.zeros_(self.B.bias)
+
+    def forward(self, x):
+        return self.A(self.B(x.T))
+
+
+class LoRA_CLIP(nn.Module):
+    def __init__(self, model: CLIP):
+        super().__init__()
+        self.origin_model = model
+        for param in self.origin_model.parameters():
+            param.requires_grad = False
+        self.LoRA = LoRA(50176, 512, np.sqrt(50176*512))
+        for param in self.LoRA.parameters():
+            param.requires_grad = True
+
+    def encode_image(self, image):
+        image = self.origin_model.encode_image(image) + self.LoRA(image)
+        return image
+
+    def encode_text(self, text):
+        text = self.origin_model.encode_text(text)
+        return text
+
+    def forward(self, image, text):
+        pass
+
+
 def convert_weights(model: nn.Module):
     """Convert applicable model parameters to fp16"""
 
