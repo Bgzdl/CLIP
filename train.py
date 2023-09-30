@@ -103,7 +103,7 @@ infonce_loss = InfoNCE_loss(temperature)
 infonce_loss = infonce_loss.cuda()
 print('temperature is ', temperature)
 # bio_tokenizer
-bio_tokenizer = BertTokenizer.from_pretrained('../biobert-base-cased-v1.2')
+bio_tokenizer = BertTokenizer.from_pretrained('./biobert-base-cased-v1.2')
 # 数据集
 print('preparing dataset')
 dataset = Patch('data', True, transform, load=False)  # '/root/autodl-tmp/patch' in autodl
