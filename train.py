@@ -7,6 +7,7 @@ from clip.model import Adapter_CLIP, LoRA_CLIP
 from dataset.dataset import Patch
 from torchvision import transforms
 from torch.utils.data import DataLoader
+from transformers import BertTokenizer
 
 
 class InfoNCE_loss(nn.Module):
@@ -60,7 +61,7 @@ def get_max_indices(matrix):
 
 
 # evaluate
-def evaluate(model, dataloader):
+def evaluate(model, dataloader, tokenizer):
     model.eval()
     correct = 0
     total = 0
@@ -72,7 +73,7 @@ def evaluate(model, dataloader):
             T = ['Well differentiated tubular adenocarcinoma',
                  'Moderately differentiated tubular adenocarcinoma',
                  'Poorly differentiated adenocarcinoma']
-            T = clip.tokenize([desc for desc in T]).cuda()
+            T = tokenizer.tokenize([desc for desc in T]).cuda()
             image_features = model.encode_image(I).float()
             text_features = model.encode_text(T).float()
             image_features /= image_features.norm(dim=-1, keepdim=True)
@@ -101,6 +102,8 @@ temperature = 0.01
 infonce_loss = InfoNCE_loss(temperature)
 infonce_loss = infonce_loss.cuda()
 print('temperature is ', temperature)
+# bio_tokenizer
+bio_tokenizer = BertTokenizer.from_pretrained('../biobert-base-cased-v1.2')
 # 数据集
 print('preparing dataset')
 dataset = Patch('data', True, transform, load=False)  # '/root/autodl-tmp/patch' in autodl
@@ -119,5 +122,5 @@ for epoch in range(epoches):
     print(epoch)
     train_loss = train(model, train_dataloader, infonce_loss, optimizer)
     print('train loss is ', train_loss)
-    acc = evaluate(model, val_dataloader)
+    acc = evaluate(model, val_dataloader, bio_tokenizer)
     print('acc is ', acc)
