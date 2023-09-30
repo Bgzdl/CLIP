@@ -3,7 +3,7 @@ import torch.optim as optim
 import numpy as np
 import torch.nn as nn
 import clip
-from clip.model import Adapter_CLIP
+from clip.model import Adapter_CLIP, LoRA_CLIP
 from dataset.dataset import Patch
 from torchvision import transforms
 from torch.utils.data import DataLoader
@@ -89,7 +89,13 @@ def evaluate(model, dataloader):
 # 模型准备
 model, transform = clip.load('ViT-B/16')
 print(transform)
-model = Adapter_CLIP(model)
+model_name = 'Adapter'  # model_name = ['Adapter', 'LoRA']
+if model_name == 'Adapter':
+    model = Adapter_CLIP(model)
+elif model_name == 'LoRA':
+    model = LoRA_CLIP(model)
+else:
+    raise Exception("unknown model name ")
 model.to('cuda')
 temperature = 0.01
 infonce_loss = InfoNCE_loss(temperature)
@@ -97,7 +103,7 @@ infonce_loss = infonce_loss.cuda()
 print('temperature is ', temperature)
 # 数据集
 print('preparing dataset')
-dataset = Patch('data', True, transform, load=False)# '/root/autodl-tmp/patch' in autodl
+dataset = Patch('data', True, transform, load=False)  # '/root/autodl-tmp/patch' in autodl
 count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
 print('Quantity of various categories is', count_0, count_1, count_2)
 train_dataset, val_dataset, test_dataset = dataset.split()

@@ -429,7 +429,6 @@ class CLIP(nn.Module):
 
     def encode_text(self, text):
         x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
-
         x = x + self.positional_embedding.type(self.dtype)
         x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer(x)
@@ -496,7 +495,7 @@ class LoRA(nn.Module):
         nn.init.zeros_(self.B.bias)
 
     def forward(self, x):
-        x = x.reshape()
+        x = x.reshape(-1, self.input_dim)
         return self.A(self.B(x.T))
 
 
