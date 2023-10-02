@@ -168,33 +168,6 @@ class QuickGELU(nn.Module):
         return x * torch.sigmoid(1.702 * x)
 
 
-class FeedforwardAdapter(nn.Module):
-    def __init__(self, input_dim, hidden_dim=64, init_scale=1e-3):
-        super(FeedforwardAdapter, self).__init__()
-
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, input_dim)
-
-        # Initialize weights and biases
-        self.fc1.weight.data.normal_(0, init_scale)
-        self.fc2.weight.data.normal_(0, init_scale)
-        self.fc1.bias.data.fill_(0)
-        self.fc2.bias.data.fill_(0)
-
-    def forward(self, x):
-        # First linear transformation
-        net = self.fc1(x)
-        net = F.gelu(net)  # Apply GELU activation
-
-        # Second linear transformation
-        net = self.fc2(net)
-
-        # Residual connection
-        net += x
-
-        return net
-
-
 class ResidualAttentionBlock(nn.Module):
     def __init__(self, d_model: int, n_head: int, attn_mask: torch.Tensor = None):
         super().__init__()
@@ -220,35 +193,6 @@ class ResidualAttentionBlock(nn.Module):
         return x
 
 
-class AdapterResidualAttentionBlock(nn.Module):
-    def __init__(self, origin_model: ResidualAttentionBlock):
-        super().__init__()
-        self.pretrained_model = origin_model
-        d_model = origin_model.d_model
-        for param in self.pretrained_model.parameters():
-            param.requires_grad = False
-        self.attn_mask = origin_model.attn_mask
-        self.adapter_layer_1 = FeedforwardAdapter(d_model)
-        for param in self.adapter_layer_1.parameters():
-            param.requires_grad = True
-        self.adapter_layer_2 = FeedforwardAdapter(d_model)
-        for param in self.adapter_layer_2.parameters():
-            param.requires_grad = True
-        self.ln_3 = LayerNorm(d_model)
-
-    def attention(self, x: torch.Tensor):
-        self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
-        return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
-
-    def forward(self, x: torch.Tensor):
-        x = x + self.pretrained_model.attention(self.pretrained_model.ln_1(x))
-        x = self.adapter_layer_1(x)
-        x = x + self.pretrained_model.mlp(self.pretrained_model.ln_2(x))
-        x = self.adapter_layer_2(x)
-        x = self.ln_3(x)
-        return x
-
-
 class Transformer(nn.Module):
     def __init__(self, width: int, layers: int, heads: int, attn_mask: torch.Tensor = None):
         super().__init__()
@@ -258,20 +202,6 @@ class Transformer(nn.Module):
 
     def forward(self, x: torch.Tensor):
         return self.resblocks(x)
-
-
-class AdapterTransformer(nn.Module):
-    def __init__(self, origin_model: Transformer):
-        super().__init__()
-        self.width = origin_model.width
-        self.layers = origin_model.layers
-        adapter_Resblocks = []
-        for block in origin_model.resblocks:
-            adapter_Resblocks.append(AdapterResidualAttentionBlock(block))
-        self.adapter_resblocks = nn.Sequential(*adapter_Resblocks)
-
-    def forward(self, x: torch.Tensor):
-        return self.adapter_resblocks(x)
 
 
 class VisionTransformer(nn.Module):
@@ -428,7 +358,9 @@ class CLIP(nn.Module):
         return self.visual(image.type(self.dtype))
 
     def encode_text(self, text):
+        print(text.shape)
         x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
+        print('\nx.shape is', x.shape)
         x = x + self.positional_embedding.type(self.dtype)
         x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer(x)
@@ -456,73 +388,6 @@ class CLIP(nn.Module):
 
         # shape = [global_batch_size, global_batch_size]
         return logits_per_image, logits_per_text
-
-
-class Adapter_CLIP(CLIP):
-    def __init__(self, model: CLIP):
-        super().__init__(model.embed_dim,
-                         # visual
-                         model.image_resolution,
-                         model.vision_layers,
-                         model.vision_width,
-                         model.vision_patch_size,
-                         # text
-                         model.context_length,
-                         model.vocab_size,
-                         model.transformer_width,
-                         model.transformer_heads,
-                         model.transformer_layers,
-                         )
-        for param in model.parameters():
-            param.requires_grad = False
-        new_model = nn.Sequential()
-        for block in self.visual.transformer.resblocks:
-            new_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
-        self.visual.transformer.resblocks = new_model
-
-
-class LoRA(nn.Module):
-    def __init__(self, input_dim, output_dim, r):
-        super().__init__()
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.r = r
-        self.A = nn.Linear(r, output_dim)
-        self.B = nn.Linear(input_dim, r)
-        nn.init.normal_(self.A.weight, mean=0, std=0.01)
-        nn.init.constant(self.A.bias, val=0)
-        nn.init.zeros_(self.B.weight)
-        nn.init.zeros_(self.B.bias)
-
-    def forward(self, x):
-        x = x.reshape(-1, self.input_dim)
-        return self.A(self.B(x.T))
-
-
-class LoRA_CLIP(CLIP):
-    def __init__(self, model: CLIP):
-        super().__init__(model.embed_dim,
-                         # visual
-                         model.image_resolution,
-                         model.vision_layers,
-                         model.vision_width,
-                         model.vision_patch_size,
-                         # text
-                         model.context_length,
-                         model.vocab_size,
-                         model.transformer_width,
-                         model.transformer_heads,
-                         model.transformer_layers,
-                         )
-        self.origin_model = model
-        for param in model.parameters():
-            param.requires_grad = False
-        self.LoRA = LoRA(224 * 224 * 3, 512, int(np.sqrt(224 * 224 * 3 * 512)))
-
-    def encode_image(self, image):
-        image_feature = self.origin_model.encode_image(image)
-        feature = self.LoRA(image)
-        return image_feature + feature
 
 
 def convert_weights(model: nn.Module):

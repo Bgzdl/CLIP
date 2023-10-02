@@ -3,7 +3,8 @@ import torch.optim as optim
 import numpy as np
 import torch.nn as nn
 import clip
-from clip.model import Adapter_CLIP, LoRA_CLIP
+from clip.LoRA import LoRA_CLIP
+from clip.Adapter import Adapter_CLIP
 from dataset.dataset import Patch
 from torchvision import transforms
 from torch.utils.data import DataLoader
@@ -61,7 +62,7 @@ def get_max_indices(matrix):
 
 
 # evaluate
-def evaluate(model, dataloader, tokenizer):
+def evaluate(model, dataloader):
     model.eval()
     correct = 0
     total = 0
@@ -73,7 +74,7 @@ def evaluate(model, dataloader, tokenizer):
             T = ['Well differentiated tubular adenocarcinoma',
                  'Moderately differentiated tubular adenocarcinoma',
                  'Poorly differentiated adenocarcinoma']
-            T = tokenizer.tokenize([desc for desc in T]).cuda()
+            T = clip.tokenize([desc for desc in T]).cuda()
             image_features = model.encode_image(I).float()
             text_features = model.encode_text(T).float()
             image_features /= image_features.norm(dim=-1, keepdim=True)
@@ -87,10 +88,22 @@ def evaluate(model, dataloader, tokenizer):
     return correct / total
 
 
+def resize_token(token):
+    desired_length = 77
+
+    if len(token) < desired_length:
+        # 如果输入张量比期望长度短，将其重塑为长度为77的向量，超出部分丢弃
+        reshaped_tensor = token.view(-1)[:desired_length]
+    else:
+        # 如果输入张量比期望长度长，将其截断为长度为77
+        reshaped_tensor = token[:desired_length]
+    return reshaped_tensor
+
+
 # 模型准备
 model, transform = clip.load('ViT-B/16')
 print(transform)
-model_name = 'Adapter'  # model_name = ['Adapter', 'LoRA']
+model_name = 'LoRA'  # model_name = ['Adapter', 'LoRA']
 if model_name == 'Adapter':
     model = Adapter_CLIP(model)
 elif model_name == 'LoRA':
@@ -122,5 +135,5 @@ for epoch in range(epoches):
     print(epoch)
     train_loss = train(model, train_dataloader, infonce_loss, optimizer)
     print('train loss is ', train_loss)
-    acc = evaluate(model, val_dataloader, bio_tokenizer)
+    acc = evaluate(model, val_dataloader)
     print('acc is ', acc)
