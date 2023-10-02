@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import clip
 from .model import CLIP
-from embedMethod import embedMethod
+from .embedMethod import embedMethod
 from biobert.biobert import bert_token_embedding
 
 

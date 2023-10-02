@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from embedMethod import embedMethod
+from .embedMethod import embedMethod
 from .model import CLIP, ResidualAttentionBlock, LayerNorm
 
 
