@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from embedMethod import embedMethod
 from .model import CLIP, ResidualAttentionBlock, LayerNorm
+
 
 class FeedforwardAdapter(nn.Module):
     def __init__(self, input_dim, hidden_dim=64, init_scale=1e-3):
@@ -60,7 +62,7 @@ class AdapterResidualAttentionBlock(nn.Module):
 
 
 class Adapter_CLIP(CLIP):
-    def __init__(self, model: CLIP):
+    def __init__(self, model: CLIP, embed: embedMethod):
         super().__init__(model.embed_dim,
                          # visual
                          model.image_resolution,
@@ -80,3 +82,23 @@ class Adapter_CLIP(CLIP):
         for block in self.visual.transformer.resblocks:
             new_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
         self.visual.transformer.resblocks = new_model
+        self.embed = embed
+
+    def encode_text(self, text):
+        if self.embed == embedMethod.clip:
+            x = super().encode_text(text)
+            return x
+        elif self.embed == embedMethod.bio_bert:
+            x = self.Biobert(text)  # [batch_size, n_ctx, d_model]
+            x = x + self.positional_embedding.type(self.dtype)
+            x = x.permute(1, 0, 2)  # NLD -> LND
+            x = self.transformer(x)
+            x = x.permute(1, 0, 2)  # LND -> NLD
+            x = self.ln_final(x).type(self.dtype)
+
+            # x.shape = [batch_size, n_ctx, transformer.width]
+            # take features from the eot embedding (eot_token is the highest number in each sequence)
+            x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.text_projection
+            return x
+        else:
+            raise Exception('Embedding Error')
