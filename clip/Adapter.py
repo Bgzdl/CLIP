@@ -79,7 +79,7 @@ class Adapter_CLIP(CLIP):
                          )
         for param in model.parameters():
             param.requires_grad = False
-        # Add adapter to vision transformer 
+        # Add adapter to vision transformer
         new_visual_model = nn.Sequential()
         for block in self.visual.transformer.resblocks:
             new_visual_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))

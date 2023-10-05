@@ -101,15 +101,17 @@ def evaluate(model, dataloader, embed: embedMethod):
 # 模型准备
 model, transform = clip.load('ViT-B/16')
 print(transform)
-model_name = 'LoRA'  # model_name = ['Adapter', 'LoRA']
+model_name = 'Adapter'  # model_name = ['Adapter', 'LoRA']
+embed = embedMethod.bio_bert
 if model_name == 'Adapter':
-    model = Adapter_CLIP(model, embedMethod.bio_bert)
+    model = Adapter_CLIP(model, embed)
 elif model_name == 'LoRA':
-    model = LoRA_CLIP(model, embedMethod.bio_bert)
+    model = LoRA_CLIP(model, embed)
 else:
     raise Exception("unknown model name ")
+print('model is ', model_name)
 model.to('cuda')
-temperature = 0.01
+temperature = 0.1
 infonce_loss = InfoNCE_loss(temperature)
 infonce_loss = infonce_loss.cuda()
 print('temperature is ', temperature)
