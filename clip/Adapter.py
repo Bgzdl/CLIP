@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .embedMethod import embedMethod
 from .model import CLIP, ResidualAttentionBlock, LayerNorm
+from biobert.biobert import bert_token_embedding
 
 
 class FeedforwardAdapter(nn.Module):
@@ -78,11 +79,19 @@ class Adapter_CLIP(CLIP):
                          )
         for param in model.parameters():
             param.requires_grad = False
-        new_model = nn.Sequential()
+        # Add adapter to vision transformer 
+        new_visual_model = nn.Sequential()
         for block in self.visual.transformer.resblocks:
-            new_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
-        self.visual.transformer.resblocks = new_model
+            new_visual_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
+        self.visual.transformer.resblocks = new_visual_model
+        # Add adapter to text transformer
+        new_text_model = nn.Sequential()
+        for block in self.transformer.resblocks:
+            new_text_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
+        self.transformer.resblocks = new_text_model
+        # Embedding method
         self.embed = embed
+        self.Biobert = bert_token_embedding()
 
     def encode_text(self, text):
         if self.embed == embedMethod.clip:
