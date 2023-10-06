@@ -128,6 +128,8 @@ print('finish')
 
 # 优化器
 optimizer = optim.Adam(model.parameters(), lr=0.0001)
+decayRate = 0.96
+scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
 epoches = 30
 
 for epoch in range(epoches):
@@ -135,5 +137,7 @@ for epoch in range(epoches):
     print(epoch)
     train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed)
     print('train loss is ', train_loss)
+    optimizer.step()
     acc = evaluate(model, val_dataloader, model.embed)
     print('acc is ', acc)
+    scheduler.step()
