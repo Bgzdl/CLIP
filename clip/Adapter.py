@@ -63,7 +63,7 @@ class AdapterResidualAttentionBlock(nn.Module):
 
 
 class Adapter_CLIP(CLIP):
-    def __init__(self, model: CLIP, embed: embedMethod):
+    def __init__(self, model: CLIP, embed: embedMethod, model_name: str):
         super().__init__(model.embed_dim,
                          # visual
                          model.image_resolution,
@@ -77,6 +77,7 @@ class Adapter_CLIP(CLIP):
                          model.transformer_heads,
                          model.transformer_layers,
                          )
+        self.name = model_name
         for param in model.parameters():
             param.requires_grad = False
         # Add adapter to vision transformer
@@ -91,7 +92,7 @@ class Adapter_CLIP(CLIP):
         self.transformer.resblocks = new_text_model
         # Embedding method
         self.embed = embed
-        self.Biobert = bert_token_embedding()
+        self.Biobert = bert_token_embedding(self.name)
 
     def encode_text(self, text):
         if self.embed == embedMethod.clip:

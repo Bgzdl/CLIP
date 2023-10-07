@@ -25,7 +25,7 @@ class LoRA(nn.Module):
 
 
 class LoRA_CLIP(CLIP):
-    def __init__(self, model: CLIP, embed: embedMethod):
+    def __init__(self, model: CLIP, embed: embedMethod, model_name):
         super().__init__(model.embed_dim,
                          # visual
                          model.image_resolution,
@@ -40,11 +40,12 @@ class LoRA_CLIP(CLIP):
                          model.transformer_layers,
                          )
 
+        self.name = model_name
         for param in super().parameters():
             param.requires_grad = False
         self.LoRA = LoRA(224 * 224 * 3, 512, 16)
         self.embed = embed
-        self.Biobert = bert_token_embedding()
+        self.Biobert = bert_token_embedding(self.name)
 
     def encode_image(self, image):
         image_feature = super().encode_image(image)

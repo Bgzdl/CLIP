@@ -17,8 +17,9 @@ bert = bert_token()
 
 
 class bert_token_embedding(nn.Module):
-    def __init__(self):
+    def __init__(self, model_name):
         super().__init__()
+        self.name = model_name
         model_config = BertConfig.from_pretrained('./biobert-base-cased-v1.2')
         model_config.output_hidden_states = True
         model_config.output_attentions = True
@@ -31,5 +32,10 @@ class bert_token_embedding(nn.Module):
         attention_mask = torch.ones(text.shape, dtype=torch.long).cuda()
         outputs = self.bert_model(text, attention_mask=attention_mask)
         x = outputs[0]
-        x = self.adaptive_layer(x)
+        if self.name == 'ViT-B/16':
+            x = self.adaptive_layer(x)
+        elif self.name == 'ViT-L/14':
+            pass
+        else:
+            raise Exception('model name error')
         return x

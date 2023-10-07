@@ -99,14 +99,15 @@ def evaluate(model, dataloader, embed: embedMethod):
 
 
 # 模型准备
-model, transform = clip.load('ViT-B/16')
+model_type = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
+model, transform = clip.load(model_type)
 print(transform)
 model_name = 'Adapter'  # model_name = ['Adapter', 'LoRA']
 embed = embedMethod.bio_bert
 if model_name == 'Adapter':
-    model = Adapter_CLIP(model, embed)
+    model = Adapter_CLIP(model, embed, model_type)
 elif model_name == 'LoRA':
-    model = LoRA_CLIP(model, embed)
+    model = LoRA_CLIP(model, embed, model_type)
 else:
     raise Exception("unknown model name ")
 print('model is ', model_name)
