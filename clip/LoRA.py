@@ -46,6 +46,7 @@ class LoRA_CLIP(CLIP):
         self.LoRA = LoRA(224 * 224 * 3, 512, 16)
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
+        self.dropout = nn.Dropout(0.3)
 
     def encode_image(self, image):
         image_feature = super().encode_image(image)
@@ -62,6 +63,7 @@ class LoRA_CLIP(CLIP):
             x = x.permute(1, 0, 2)  # NLD -> LND
             x = self.transformer(x)
             x = x.permute(1, 0, 2)  # LND -> NLD
+            x = self.dropout(x)
             x = self.ln_final(x).type(self.dtype)
 
             # x.shape = [batch_size, n_ctx, transformer.width]

@@ -31,7 +31,6 @@ class InfoNCE_loss(nn.Module):
 
 # train
 def train(model, dataloader, criterion, optimizer, embed):
-    model.train()
     running_loss = 0.0
     for dictionary in train_dataloader:
         optimizer.zero_grad()
@@ -68,50 +67,50 @@ def get_max_indices(matrix):
 
 # evaluate
 def evaluate(model, dataloader, embed: embedMethod):
-    model.eval()
     correct = 0
     total = 0
-    with torch.no_grad():
-        T = ['Well differentiated tubular adenocarcinoma',
-             'Moderately differentiated tubular adenocarcinoma',
-             'Poorly differentiated adenocarcinoma']
-        if embed == embedMethod.clip:
-            T = clip.tokenize([desc for desc in T]).cuda()
-        elif embed == embedMethod.bio_bert:
-            T = bert.tokenize([desc for desc in T]).cuda()
-        else:
-            raise Exception("Val Token Error")
-        text_features = model.encode_text(T).float()
-        text_features /= text_features.norm(dim=-1, keepdim=True)
-        for dictionary in dataloader:
-            I = dictionary['data']
-            I = torch.tensor(np.stack(I)).cuda()
-            label = dictionary['label']
-            image_features = model.encode_image(I).float()
-            image_features /= image_features.norm(dim=-1, keepdim=True)
-            similarity = text_features.cpu().numpy() @ image_features.cpu().numpy().T
-            predict = get_max_indices(similarity.T)
-            total += len(predict)
-            predict, label = np.array(predict), np.array(label)
-            comparision = predict == label
-            correct += np.sum(comparision)
+    T = ['Well differentiated tubular adenocarcinoma',
+         'Moderately differentiated tubular adenocarcinoma',
+         'Poorly differentiated adenocarcinoma']
+    if embed == embedMethod.clip:
+        T = clip.tokenize([desc for desc in T]).cuda()
+    elif embed == embedMethod.bio_bert:
+        T = bert.tokenize([desc for desc in T]).cuda()
+    else:
+        raise Exception("Val Token Error")
+    text_features = model.encode_text(T).float()
+    text_features /= text_features.norm(dim=-1, keepdim=True)
+    for dictionary in dataloader:
+        I = dictionary['data']
+        I = torch.tensor(np.stack(I)).cuda()
+        label = dictionary['label']
+        image_features = model.encode_image(I).float()
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+        similarity = text_features.cpu().numpy() @ image_features.cpu().numpy().T
+        predict = get_max_indices(similarity.T)
+        total += len(predict)
+        predict, label = np.array(predict), np.array(label)
+        comparision = predict == label
+        correct += np.sum(comparision)
     return correct / total
 
 
 # 模型准备
-model_type = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
-model, transform = clip.load(model_type)
-print(transform)
-model_name = 'Adapter'  # model_name = ['Adapter', 'LoRA']
+model_name = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
+model, transform = clip.load(model_name)
+print(model_name)
+Optimization = 'Adapter'  # model_name = ['Adapter', 'LoRA']
 embed = embedMethod.bio_bert
-if model_name == 'Adapter':
-    model = Adapter_CLIP(model, embed, model_type)
-elif model_name == 'LoRA':
-    model = LoRA_CLIP(model, embed, model_type)
+if Optimization == 'Adapter':
+    model = Adapter_CLIP(model, embed, model_name)
+elif Optimization == 'LoRA':
+    model = LoRA_CLIP(model, embed, model_name)
 else:
     raise Exception("unknown model name ")
-print('model is ', model_name)
+print('model is ', Optimization)
 model.to('cuda')
+
+# 超参设置
 temperature = 0.1
 infonce_loss = InfoNCE_loss(temperature)
 infonce_loss = infonce_loss.cuda()
@@ -136,11 +135,12 @@ epoches = 30
 for epoch in range(epoches):
     torch.cuda.empty_cache()
     print(epoch)
+    model.train()
     train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed)
     print('train loss is ', train_loss)
     optimizer.step()
+    model.eval()
     with torch.no_grad():
-        model.eval()
         acc = evaluate(model, val_dataloader, model.embed)
         print('acc is ', acc)
         scheduler.step()
