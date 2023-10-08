@@ -139,6 +139,8 @@ for epoch in range(epoches):
     train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed)
     print('train loss is ', train_loss)
     optimizer.step()
-    acc = evaluate(model, val_dataloader, model.embed)
-    print('acc is ', acc)
-    scheduler.step()
+    with torch.no_grad():
+        model.eval()
+        acc = evaluate(model, val_dataloader, model.embed)
+        print('acc is ', acc)
+        scheduler.step()
