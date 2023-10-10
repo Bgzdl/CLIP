@@ -6,7 +6,7 @@ import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 # tokenizer
 from biobert.biobert import bert
-from clip.Adapter import Adapter_CLIP, Adapter_CLIP_1
+from clip.Adapter import Adapter_CLIP
 from dataset.dataset import Patch
 from torch.utils.data import DataLoader
 
