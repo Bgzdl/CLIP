@@ -31,7 +31,10 @@ class LoRA_CLIP(nn.Module):
         self.origin_model, _ = clip.load(model_name)
         for param in self.origin_model.parameters():
             param.requires_grad = False
-        self.LoRA = LoRA(224 * 224 * 3, 512, 16)
+        if self.name == 'ViT-L/14':
+            self.LoRA = LoRA(224 * 224 * 3, 768, 16)
+        elif self.name == 'ViT-B/16':
+            self.LoRa = LoRA(224*224*3, 512, 16)
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
 

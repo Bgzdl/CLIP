@@ -48,6 +48,7 @@ def train(model, dataloader, criterion, optimizer, embed):
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
+
     return running_loss / len(dataloader)
 
 
@@ -92,6 +93,7 @@ def evaluate(model, dataloader, embed: embedMethod):
         predict, label = np.array(predict), np.array(label)
         comparision = predict == label
         correct += np.sum(comparision)
+
     return correct / total
 
 
@@ -111,7 +113,7 @@ print('model is ', Optimization)
 model.to('cuda')
 
 # 超参设置
-temperature = 0.1
+temperature = 0.01
 infonce_loss = InfoNCE_loss(temperature)
 infonce_loss = infonce_loss.cuda()
 print('temperature is ', temperature)
@@ -127,7 +129,7 @@ val_dataloader = DataLoader(val_dataset, batch_size=128, shuffle=True)
 print('finish')
 
 # 优化器
-optimizer = optim.Adam(model.parameters(), lr=0.0001)
+optimizer = optim.Adam(model.parameters(), lr=0.00001)
 decayRate = 0.96
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
 epoches = 30
@@ -139,9 +141,9 @@ for epoch in range(epoches):
         model.train()
         train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed)
         print('train loss is ', train_loss)
-        optimizer.step()
+        scheduler.step()
         model.eval()
         with torch.no_grad():
             acc = evaluate(model, val_dataloader, model.embed)
             print('acc is ', acc)
-            scheduler.step()
+
