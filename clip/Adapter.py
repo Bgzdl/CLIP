@@ -89,7 +89,7 @@ class Adapter_CLIP(nn.Module):
 
     def encode_text(self, text):
         if self.embed == embedMethod.clip:
-            x = super().encode_text(text)
+            x = self.origin_model.encode_text(text)
             return x
         elif self.embed == embedMethod.bio_bert:
             x = self.Biobert(text)  # [batch_size, n_ctx, d_model]
