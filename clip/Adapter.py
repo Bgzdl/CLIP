@@ -84,6 +84,9 @@ class Adapter_CLIP(nn.Module):
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
 
+    def encode_image(self, image):
+        return self.origin_model.encode_image(image)
+
     def encode_text(self, text):
         if self.embed == embedMethod.clip:
             x = super().encode_text(text)
@@ -102,5 +105,21 @@ class Adapter_CLIP(nn.Module):
             return x
         else:
             raise Exception('Embedding Error')
+
+    def forward(self, image, text):
+        image_features = self.encode_image(image)
+        text_features = self.encode_text(text)
+
+        # normalized features
+        image_features = image_features / image_features.norm(dim=1, keepdim=True)
+        text_features = text_features / text_features.norm(dim=1, keepdim=True)
+
+        # cosine similarity as logits
+        logit_scale = self.origin_model.logit_scale.exp()
+        logits_per_image = logit_scale * image_features @ text_features.t()
+        logits_per_text = logits_per_image.t()
+
+        # shape = [global_batch_size, global_batch_size]
+        return logits_per_image, logits_per_text
 
 
