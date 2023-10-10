@@ -25,10 +25,10 @@ class LoRA(nn.Module):
 
 
 class LoRA_CLIP(nn.Module):
-    def __init__(self, embed: embedMethod, model_name):
+    def __init__(self, model: CLIP, embed: embedMethod, model_name):
         super().__init__()
         self.name = model_name
-        self.origin_model, _ = clip.load(model_name)
+        self.origin_model = model
         for param in self.origin_model.parameters():
             param.requires_grad = False
         if self.name == 'ViT-L/14':
