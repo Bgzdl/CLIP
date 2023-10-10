@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import clip
 from .embedMethod import embedMethod
 from .model import CLIP, ResidualAttentionBlock, LayerNorm
 from biobert.biobert import bert_token_embedding
@@ -62,38 +63,26 @@ class AdapterResidualAttentionBlock(nn.Module):
         return x
 
 
-class Adapter_CLIP(CLIP):
-    def __init__(self, model: CLIP, embed: embedMethod, model_name: str):
-        super().__init__(model.embed_dim,
-                         # visual
-                         model.image_resolution,
-                         model.vision_layers,
-                         model.vision_width,
-                         model.vision_patch_size,
-                         # text
-                         model.context_length,
-                         model.vocab_size,
-                         model.transformer_width,
-                         model.transformer_heads,
-                         model.transformer_layers,
-                         )
+class Adapter_CLIP(nn.Module):
+    def __init__(self, embed: embedMethod, model_name: str):
+        super().__init__()
         self.name = model_name
-        for param in model.parameters():
+        self.origin_model, _ = clip.load(model_name)
+        for param in self.origin_model.parameters():
             param.requires_grad = False
         # Add adapter to vision transformer
         new_visual_model = nn.Sequential()
-        for block in self.visual.transformer.resblocks:
+        for block in self.origin_model.visual.transformer.resblocks:
             new_visual_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
-        self.visual.transformer.resblocks = new_visual_model
+        self.origin_model.visual.transformer.resblocks = new_visual_model
         # Add adapter to text transformer
         new_text_model = nn.Sequential()
-        for block in self.transformer.resblocks:
+        for block in self.origin_model.transformer.resblocks:
             new_text_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
-        self.transformer.resblocks = new_text_model
+        self.origin_model.transformer.resblocks = new_text_model
         # Embedding method
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
-        self.dropout = nn.Dropout(0.3)
 
     def encode_text(self, text):
         if self.embed == embedMethod.clip:
@@ -101,16 +90,17 @@ class Adapter_CLIP(CLIP):
             return x
         elif self.embed == embedMethod.bio_bert:
             x = self.Biobert(text)  # [batch_size, n_ctx, d_model]
-            x = x + self.positional_embedding.type(self.dtype)
+            x = x + self.origin_model.positional_embedding.type(self.dtype)
             x = x.permute(1, 0, 2)  # NLD -> LND
-            x = self.transformer(x)
+            x = self.origin_model.transformer(x)
             x = x.permute(1, 0, 2)  # LND -> NLD
-            x = self.dropout(x)
-            x = self.ln_final(x).type(self.dtype)
+            x = self.origin_model.ln_final(x).type(self.origin_model.dtype)
 
             # x.shape = [batch_size, n_ctx, transformer.width]
             # take features from the eot embedding (eot_token is the highest number in each sequence)
-            x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.text_projection
+            x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.origin_model.text_projection
             return x
         else:
             raise Exception('Embedding Error')
+
+

@@ -24,51 +24,37 @@ class LoRA(nn.Module):
         return self.A(self.B(x))
 
 
-class LoRA_CLIP(CLIP):
-    def __init__(self, model: CLIP, embed: embedMethod, model_name):
-        super().__init__(model.embed_dim,
-                         # visual
-                         model.image_resolution,
-                         model.vision_layers,
-                         model.vision_width,
-                         model.vision_patch_size,
-                         # text
-                         model.context_length,
-                         model.vocab_size,
-                         model.transformer_width,
-                         model.transformer_heads,
-                         model.transformer_layers,
-                         )
-
+class LoRA_CLIP(nn.Module):
+    def __init__(self, embed: embedMethod, model_name):
+        super().__init__()
         self.name = model_name
-        for param in super().parameters():
+        self.origin_model, _ = clip.load(model_name)
+        for param in self.origin_model.parameters():
             param.requires_grad = False
         self.LoRA = LoRA(224 * 224 * 3, 512, 16)
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
-        self.dropout = nn.Dropout(0.3)
 
     def encode_image(self, image):
-        image_feature = super().encode_image(image)
+        image_feature = self.origin_model.encode_image(image)
         feature = self.LoRA(image)
         return image_feature + feature
 
     def encode_text(self, text):
         if self.embed == embedMethod.clip:
-            x = super().encode_text(text)
+            x = self.origin_model.encode_text(text)
             return x
         elif self.embed == embedMethod.bio_bert:
             x = self.Biobert(text)  # [batch_size, n_ctx, d_model]
-            x = x + self.positional_embedding.type(self.dtype)
+            x = x + self.origin_model.positional_embedding.type(self.origin_model.dtype)
             x = x.permute(1, 0, 2)  # NLD -> LND
-            x = self.transformer(x)
+            x = self.origin_model.transformer(x)
             x = x.permute(1, 0, 2)  # LND -> NLD
-            x = self.dropout(x)
-            x = self.ln_final(x).type(self.dtype)
+            x = self.origin_model.ln_final(x).type(self.origin_model.dtype)
 
             # x.shape = [batch_size, n_ctx, transformer.width]
             # take features from the eot embedding (eot_token is the highest number in each sequence)
-            x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.text_projection
+            x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.origin_model.text_projection
             return x
         else:
             raise Exception('Embedding Error')

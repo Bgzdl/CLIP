@@ -6,7 +6,7 @@ import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 # tokenizer
 from biobert.biobert import bert
-from clip.Adapter import Adapter_CLIP
+from clip.Adapter import Adapter_CLIP, Adapter_CLIP_1
 from dataset.dataset import Patch
 from torch.utils.data import DataLoader
 
@@ -97,14 +97,15 @@ def evaluate(model, dataloader, embed: embedMethod):
 
 # 模型准备
 model_name = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
-model, transform = clip.load(model_name)
+_, transform = clip.load(model_name)
 print(model_name)
 Optimization = 'Adapter'  # model_name = ['Adapter', 'LoRA']
 embed = embedMethod.bio_bert
 if Optimization == 'Adapter':
-    model = Adapter_CLIP(model, embed, model_name)
+    model = Adapter_CLIP(embed, model_name)
 elif Optimization == 'LoRA':
-    model = LoRA_CLIP(model, embed, model_name)
+    model = LoRA_CLIP(embed, model_name)
+
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
