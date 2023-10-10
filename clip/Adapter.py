@@ -93,7 +93,7 @@ class Adapter_CLIP(nn.Module):
             return x
         elif self.embed == embedMethod.bio_bert:
             x = self.Biobert(text)  # [batch_size, n_ctx, d_model]
-            x = x + self.origin_model.positional_embedding.type(self.dtype)
+            x = x + self.origin_model.positional_embedding.type(self.origin_model.dtype)
             x = x.permute(1, 0, 2)  # NLD -> LND
             x = self.origin_model.transformer(x)
             x = x.permute(1, 0, 2)  # LND -> NLD

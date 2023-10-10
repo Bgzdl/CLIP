@@ -105,7 +105,6 @@ if Optimization == 'Adapter':
     model = Adapter_CLIP(embed, model_name)
 elif Optimization == 'LoRA':
     model = LoRA_CLIP(embed, model_name)
-
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
@@ -136,12 +135,13 @@ epoches = 30
 for epoch in range(epoches):
     torch.cuda.empty_cache()
     print(epoch)
-    model.train()
-    train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed)
-    print('train loss is ', train_loss)
-    optimizer.step()
-    model.eval()
-    with torch.no_grad():
-        acc = evaluate(model, val_dataloader, model.embed)
-        print('acc is ', acc)
-        scheduler.step()
+    with torch.autocast("cuda"):
+        model.train()
+        train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed)
+        print('train loss is ', train_loss)
+        optimizer.step()
+        model.eval()
+        with torch.no_grad():
+            acc = evaluate(model, val_dataloader, model.embed)
+            print('acc is ', acc)
+            scheduler.step()
