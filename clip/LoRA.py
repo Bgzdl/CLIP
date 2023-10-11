@@ -6,22 +6,54 @@ from .embedMethod import embedMethod
 from biobert.biobert import bert_token_embedding
 
 
-class LoRA(nn.Module):
-    def __init__(self, input_dim, output_dim, r):
-        super().__init__()
-        self.input_dim = input_dim
-        self.output_dim = output_dim
+class LoRALayer():
+    def __init__(
+        self,
+        r: int,
+        lora_alpha: int,
+        lora_dropout: float,
+        merge_weights: bool,
+    ):
         self.r = r
-        self.A = nn.Linear(r, output_dim)
-        self.B = nn.Linear(input_dim, r)
-        nn.init.normal_(self.A.weight, mean=0, std=0.01)
-        nn.init.constant_(self.A.bias, val=0)
-        nn.init.zeros_(self.B.weight)
-        nn.init.zeros_(self.B.bias)
+        self.lora_alpha = lora_alpha
+        # Optional dropout
+        if lora_dropout > 0.:
+            self.lora_dropout = nn.Dropout(p=lora_dropout)
+        else:
+            self.lora_dropout = lambda x: x
+        # Mark the weight as unmerged
+        self.merged = False
+        self.merge_weights = merge_weights
+
+
+class LoRA(nn.Module, LoRALayer):
+    def __init__(
+            self,
+            in_features: int,
+            out_features: int,
+            r: int = 8,
+            lora_alpha: int = 1,
+            lora_dropout: float = 0.,
+            # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
+            merge_weights: bool = True,
+    ):
+        nn.Module.__init__(self)
+        LoRALayer.__init__(self, r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout,
+                           merge_weights=merge_weights)
+        self.in_features = in_features
+        self.out_features = out_features
+        self.scaling = self.lora_alpha / self.r
+        self.lora_A = nn.Linear(r, in_features)
+        self.lora_B = nn.Linear(out_features, r)
+        nn.init.normal_(self.lora_A.weight, mean=0, std=0.01)
+        nn.init.constant_(self.lora_A.bias, val=0)
+        nn.init.zeros_(self.lora_B.weight)
+        nn.init.zeros_(self.lora_B.bias)
 
     def forward(self, x):
-        x = x.reshape(-1, self.input_dim)
-        return self.A(self.B(x))
+        x = x.reshape(-1, self.in_features)
+        result = self.lora_dropout(x) @ self.lora_A.transpose(0, 1) @ self.lora_B.transpose(0, 1)
+        return result
 
 
 class LoRA_CLIP(nn.Module):
@@ -40,8 +72,8 @@ class LoRA_CLIP(nn.Module):
 
     def encode_image(self, image):
         image_feature = self.origin_model.encode_image(image)
-        feature = self.LoRA(image)
-        return image_feature + feature
+        LoRA_feature = self.LoRA(image)
+        return image_feature + LoRA_feature
 
     def encode_text(self, text):
         if self.embed == embedMethod.clip:
