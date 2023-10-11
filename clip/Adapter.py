@@ -41,7 +41,6 @@ class AdapterResidualAttentionBlock(nn.Module):
         d_model = origin_model.d_model
         for param in self.pretrained_model.parameters():
             param.requires_grad = False
-        self.attn_mask = origin_model.attn_mask
         self.adapter_layer_1 = FeedforwardAdapter(d_model)
         for param in self.adapter_layer_1.parameters():
             param.requires_grad = True
@@ -49,10 +48,6 @@ class AdapterResidualAttentionBlock(nn.Module):
         for param in self.adapter_layer_2.parameters():
             param.requires_grad = True
         self.ln_3 = LayerNorm(d_model)
-
-    def attention(self, x: torch.Tensor):
-        self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
-        return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
 
     def forward(self, x: torch.Tensor):
         x = x + self.pretrained_model.attention(self.pretrained_model.ln_1(x))
@@ -75,11 +70,6 @@ class Adapter_CLIP(nn.Module):
         for block in self.origin_model.visual.transformer.resblocks:
             new_visual_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
         self.origin_model.visual.transformer.resblocks = new_visual_model
-        # Add adapter to text transformer
-        new_text_model = nn.Sequential()
-        for block in self.origin_model.transformer.resblocks:
-            new_text_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
-        self.origin_model.transformer.resblocks = new_text_model
         # Embedding method
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
@@ -121,5 +111,3 @@ class Adapter_CLIP(nn.Module):
 
         # shape = [global_batch_size, global_batch_size]
         return logits_per_image, logits_per_text
-
-

@@ -129,7 +129,7 @@ val_dataloader = DataLoader(val_dataset, batch_size=128, shuffle=True)
 print('finish')
 
 # 优化器
-optimizer = optim.Adam(model.parameters(), lr=0.00001)
+optimizer = optim.Adam(model.parameters(), lr=0.0001)
 decayRate = 0.96
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
 epoches = 30
