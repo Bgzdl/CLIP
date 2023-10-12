@@ -33,7 +33,7 @@ class LoRA(nn.Module, LoRALayer):
             out_features: int,
             r: int = 8,
             lora_alpha: int = 1,
-            lora_dropout: float = 0.,
+            lora_dropout: float = 0.0,
             # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
             merge_weights: bool = True,
     ):
@@ -57,17 +57,18 @@ class LoRA(nn.Module, LoRALayer):
 
 
 class LoraResidualAttentionBlock(nn.Module):
-    def __init__(self, origin_model: nn.Module):
+    def __init__(self, origin_model: nn.Module, d_model: int):
         super().__init__()
         self.origin_model = origin_model
         for param in self.origin_model.parameters():
             param.requires_grad = False
+        self.LoRA = LoRA(d_model, d_model, 8)
 
     def forward(self, x: torch.Tensor):
-        print(x.shape)
+        lora_features = self.LoRA(x)
         x = x + self.origin_model.attention(self.origin_model.ln_1(x))
         x = x + self.origin_model.mlp(self.origin_model.ln_2(x))
-        print(x.shape)
+        x += lora_features
         return x
 
 
@@ -78,10 +79,10 @@ class LoRA_CLIP(nn.Module):
         self.origin_model = model
         for param in self.origin_model.parameters():
             param.requires_grad = False
-        new_visual_model = nn.Sequential()
-        for block in self.origin_model.visual.transformer.resblocks:
-            new_visual_model.add_module('LoraResidualAttentionBlock', LoraResidualAttentionBlock(block))
-        self.origin_model.transformer.resblocks = new_visual_model
+        new_model = nn.Sequential()
+        for block in self.origin_model.transformer.resblocks:
+            new_model.add_module('LoraResidualAttentionBlock', LoraResidualAttentionBlock(block, block.d_model))
+        self.origin_model.transformer.resblocks = new_model
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
 
