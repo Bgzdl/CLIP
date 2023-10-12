@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import clip
-from .model import CLIP
 from .embedMethod import embedMethod
+from .model import CLIP, ResidualAttentionBlock, LayerNorm
 from biobert.biobert import bert_token_embedding
 
 
@@ -43,8 +43,8 @@ class LoRA(nn.Module, LoRALayer):
         self.in_features = in_features
         self.out_features = out_features
         self.scaling = self.lora_alpha / self.r
-        self.lora_A = nn.Linear(r, in_features)
-        self.lora_B = nn.Linear(out_features, r)
+        self.lora_A = nn.Linear(in_features, r)
+        self.lora_B = nn.Linear(r, out_features)
         nn.init.normal_(self.lora_A.weight, mean=0, std=0.01)
         nn.init.constant_(self.lora_A.bias, val=0)
         nn.init.zeros_(self.lora_B.weight)
@@ -52,8 +52,23 @@ class LoRA(nn.Module, LoRALayer):
 
     def forward(self, x):
         x = x.reshape(-1, self.in_features)
-        result = self.lora_dropout(x) @ self.lora_A.transpose(0, 1) @ self.lora_B.transpose(0, 1)
+        result = self.lora_B(self.lora_A(self.lora_dropout(x)))
         return result
+
+
+class LoraResidualAttentionBlock(nn.Module):
+    def __init__(self, origin_model: nn.Module):
+        super().__init__()
+        self.origin_model = origin_model
+        for param in self.origin_model.parameters():
+            param.requires_grad = False
+
+    def forward(self, x: torch.Tensor):
+        print(x.shape)
+        x = x + self.origin_model.attention(self.origin_model.ln_1(x))
+        x = x + self.origin_model.mlp(self.origin_model.ln_2(x))
+        print(x.shape)
+        return x
 
 
 class LoRA_CLIP(nn.Module):
@@ -63,17 +78,16 @@ class LoRA_CLIP(nn.Module):
         self.origin_model = model
         for param in self.origin_model.parameters():
             param.requires_grad = False
-        if self.name == 'ViT-L/14':
-            self.LoRA = LoRA(224 * 224 * 3, 768, 16)
-        elif self.name == 'ViT-B/16':
-            self.LoRa = LoRA(224*224*3, 512, 16)
+        new_visual_model = nn.Sequential()
+        for block in self.origin_model.visual.transformer.resblocks:
+            new_visual_model.add_module('LoraResidualAttentionBlock', LoraResidualAttentionBlock(block))
+        self.origin_model.transformer.resblocks = new_visual_model
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
 
     def encode_image(self, image):
         image_feature = self.origin_model.encode_image(image)
-        LoRA_feature = self.LoRA(image)
-        return image_feature + LoRA_feature
+        return image_feature
 
     def encode_text(self, text):
         if self.embed == embedMethod.clip:

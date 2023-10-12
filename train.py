@@ -19,6 +19,8 @@ class InfoNCE_loss(nn.Module):
     def forward(self, predict, target):
         # joint multimodal embedding [n, d_e]
         # scaled pairwise cosine similarities [n, n]
+        predict = predict / predict.norm(dim=1, keepdim=True)
+        target = target / target.norm(dim=1, keepdim=True)
         logits = torch.mm(predict, target.T) * np.exp(self.t)
         # symmetric loss function
         labels = torch.tensor(np.arange(len(predict))).to('cuda')

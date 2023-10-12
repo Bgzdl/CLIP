@@ -50,11 +50,13 @@ class AdapterResidualAttentionBlock(nn.Module):
         self.ln_3 = LayerNorm(d_model)
 
     def forward(self, x: torch.Tensor):
+        print(x.shape)
         x = x + self.pretrained_model.attention(self.pretrained_model.ln_1(x))
         x = self.adapter_layer_1(x)
         x = x + self.pretrained_model.mlp(self.pretrained_model.ln_2(x))
         x = self.adapter_layer_2(x)
         x = self.ln_3(x)
+        print(x.shape)
         return x
 
 
