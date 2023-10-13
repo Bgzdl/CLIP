@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import clip
 from .embedMethod import embedMethod
-from .model import CLIP, ResidualAttentionBlock, LayerNorm
+import math
 from biobert.biobert import bert_token_embedding
 
 
@@ -43,15 +43,13 @@ class LoRA(nn.Module, LoRALayer):
         self.in_features = in_features
         self.out_features = out_features
         self.scaling = self.lora_alpha / self.r
-        self.lora_A = nn.Linear(in_features, r)
-        self.lora_B = nn.Linear(r, out_features)
-        nn.init.normal_(self.lora_A.weight, mean=0, std=0.01)
-        nn.init.constant_(self.lora_A.bias, val=0)
-        nn.init.zeros_(self.lora_B.weight)
-        nn.init.zeros_(self.lora_B.bias)
+        self.lora_A = nn.Parameter(torch.zeros(r, in_features))
+        self.lora_B = nn.Parameter(torch.zeros(out_features, r))
+        nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
+        nn.init.zeros_(self.lora_B)
 
     def forward(self, x):
-        result = self.lora_B(self.lora_A(self.lora_dropout(x)))
+        result = self.lora_dropout(x) @ self.lora_A.transpose(0, 1) @ self.lora_B.transpose(0, 1)
         return result
 
 

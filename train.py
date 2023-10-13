@@ -112,7 +112,12 @@ elif Optimization == 'LoRA':
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
-model.to('cuda')
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
+if torch.cuda.device_count() > 1:
+    model = nn.DataParallel(model)
 
 # 超参设置
 temperature = 0.01
@@ -125,8 +130,8 @@ dataset = Patch('data', True, transform, load=False)  # '/root/autodl-tmp/patch'
 count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
 print('Quantity of various categories is', count_0, count_1, count_2)
 train_dataset, val_dataset, test_dataset = dataset.split()
-train_dataloader = DataLoader(train_dataset, batch_size=256, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=256, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=8)
+val_dataloader = DataLoader(val_dataset, batch_size=256, shuffle=True, num_workers=8)
 print('finish')
 
 # 优化器
