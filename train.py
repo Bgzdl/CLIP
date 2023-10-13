@@ -9,6 +9,7 @@ from biobert.biobert import bert
 from clip.Adapter import Adapter_CLIP
 from dataset.dataset import Patch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 class InfoNCE_loss(nn.Module):
@@ -32,9 +33,9 @@ class InfoNCE_loss(nn.Module):
 
 
 # train
-def train(model, dataloader, criterion, optimizer, embed):
+def train(model, dataloader, criterion, optimizer, embed, epoch):
     running_loss = 0.0
-    for dictionary in train_dataloader:
+    for dictionary in tqdm(train_dataloader, desc=f"Epoch {epoch+1}/{30}"):
         optimizer.zero_grad()
         I, T = dictionary['data'], dictionary['target']
         I = torch.tensor(np.stack(I)).cuda()
@@ -130,6 +131,7 @@ dataset = Patch('data', True, transform, load=False)  # '/root/autodl-tmp/patch'
 count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
 print('Quantity of various categories is', count_0, count_1, count_2)
 train_dataset, val_dataset, test_dataset = dataset.split()
+
 train_dataloader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=8)
 val_dataloader = DataLoader(val_dataset, batch_size=256, shuffle=True, num_workers=8)
 print('finish')
@@ -145,8 +147,8 @@ for epoch in range(epoches):
     print(epoch)
     with torch.autocast("cuda"):
         model.train()
-        train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed)
-        print('train loss is ', train_loss)
+        train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed, epoch)
+        print(f"Epoch {epoch + 1}/{30}, Average Loss: {train_loss:.4f}")
         scheduler.step()
         model.eval()
         with torch.no_grad():

@@ -81,7 +81,6 @@ class LoRA_CLIP(nn.Module):
             new_model.append(LoraResidualAttentionBlock(block, block.d_model))
         new_model = nn.Sequential(*new_model)
         self.origin_model.transformer.resblocks = new_model
-        print(self.origin_model.transformer.resblocks)
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
 
