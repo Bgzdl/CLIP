@@ -51,7 +51,6 @@ class LoRA(nn.Module, LoRALayer):
         nn.init.zeros_(self.lora_B.bias)
 
     def forward(self, x):
-        x = x.reshape(-1, self.in_features)
         result = self.lora_B(self.lora_A(self.lora_dropout(x)))
         return result
 
@@ -73,16 +72,17 @@ class LoraResidualAttentionBlock(nn.Module):
 
 
 class LoRA_CLIP(nn.Module):
-    def __init__(self, model: CLIP, embed: embedMethod, model_name):
+    def __init__(self, embed: embedMethod, model_name):
         super().__init__()
         self.name = model_name
-        self.origin_model = model
+        self.origin_model, _ = clip.load(model_name)
         for param in self.origin_model.parameters():
             param.requires_grad = False
         new_model = nn.Sequential()
         for block in self.origin_model.transformer.resblocks:
             new_model.add_module('LoraResidualAttentionBlock', LoraResidualAttentionBlock(block, block.d_model))
         self.origin_model.transformer.resblocks = new_model
+        print(self.origin_model.transformer.resblocks)
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
 

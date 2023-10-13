@@ -101,14 +101,14 @@ def evaluate(model, dataloader, embed: embedMethod):
 
 # 模型准备
 model_name = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
-model, transform = clip.load(model_name)
+_, transform = clip.load(model_name)
 print(model_name)
 Optimization = 'Adapter'  # model_name = ['Adapter', 'LoRA']
 embed = embedMethod.bio_bert
 if Optimization == 'Adapter':
     model = Adapter_CLIP(embed, model_name)
 elif Optimization == 'LoRA':
-    model = LoRA_CLIP(model, embed, model_name)
+    model = LoRA_CLIP(embed, model_name)
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
@@ -118,7 +118,6 @@ model.to('cuda')
 temperature = 0.01
 infonce_loss = InfoNCE_loss(temperature)
 infonce_loss = infonce_loss.cuda()
-print('temperature is ', temperature)
 
 # 数据集
 print('preparing dataset')
@@ -126,8 +125,8 @@ dataset = Patch('data', True, transform, load=False)  # '/root/autodl-tmp/patch'
 count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
 print('Quantity of various categories is', count_0, count_1, count_2)
 train_dataset, val_dataset, test_dataset = dataset.split()
-train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=128, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size=256, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=256, shuffle=True)
 print('finish')
 
 # 优化器
