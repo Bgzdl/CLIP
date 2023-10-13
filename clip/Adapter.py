@@ -35,7 +35,7 @@ class FeedforwardAdapter(nn.Module):
 
 
 class AdapterResidualAttentionBlock(nn.Module):
-    def __init__(self, origin_model: ResidualAttentionBlock):
+    def __init__(self, origin_model: nn.Module):
         super().__init__()
         self.pretrained_model = origin_model
         d_model = origin_model.d_model
@@ -50,13 +50,11 @@ class AdapterResidualAttentionBlock(nn.Module):
         self.ln_3 = LayerNorm(d_model)
 
     def forward(self, x: torch.Tensor):
-        print(x.shape)
         x = x + self.pretrained_model.attention(self.pretrained_model.ln_1(x))
         x = self.adapter_layer_1(x)
         x = x + self.pretrained_model.mlp(self.pretrained_model.ln_2(x))
         x = self.adapter_layer_2(x)
         x = self.ln_3(x)
-        print(x.shape)
         return x
 
 
@@ -68,9 +66,10 @@ class Adapter_CLIP(nn.Module):
         for param in self.origin_model.parameters():
             param.requires_grad = False
         # Add adapter to vision transformer
-        new_visual_model = nn.Sequential()
+        new_visual_model = []
         for block in self.origin_model.visual.transformer.resblocks:
-            new_visual_model.add_module('AdapterResidualAttentionBlock', AdapterResidualAttentionBlock(block))
+            new_visual_model.append(AdapterResidualAttentionBlock(block))
+        new_visual_model = nn.Sequential(*new_visual_model)
         self.origin_model.visual.transformer.resblocks = new_visual_model
         # Embedding method
         self.embed = embed

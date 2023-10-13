@@ -78,9 +78,10 @@ class LoRA_CLIP(nn.Module):
         self.origin_model, _ = clip.load(model_name)
         for param in self.origin_model.parameters():
             param.requires_grad = False
-        new_model = nn.Sequential()
+        new_model = []
         for block in self.origin_model.transformer.resblocks:
-            new_model.add_module('LoraResidualAttentionBlock', LoraResidualAttentionBlock(block, block.d_model))
+            new_model.append(LoraResidualAttentionBlock(block, block.d_model))
+        new_model = nn.Sequential(*new_model)
         self.origin_model.transformer.resblocks = new_model
         print(self.origin_model.transformer.resblocks)
         self.embed = embed
