@@ -84,7 +84,7 @@ def evaluate(model, dataloader, embed: embedMethod):
         raise Exception("Val Token Error")
     text_features = model.encode_text(T).float()
     text_features /= text_features.norm(dim=-1, keepdim=True)
-    for dictionary in dataloader:
+    for dictionary in tqdm(dataloader):
         I = dictionary['data']
         I = torch.tensor(np.stack(I)).cuda()
         label = dictionary['label']
@@ -144,14 +144,13 @@ epoches = 30
 
 for epoch in range(epoches):
     torch.cuda.empty_cache()
-    print(epoch)
     with torch.autocast("cuda"):
         model.train()
         train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed, epoch)
-        print(f"Epoch {epoch + 1}/{30}, Average Loss: {train_loss:.4f}")
+        print(f"Train Epoch {epoch + 1}/{30}, Average Loss: {train_loss:.4f}")
         scheduler.step()
         model.eval()
         with torch.no_grad():
             acc = evaluate(model, val_dataloader, model.embed)
-            print('acc is ', acc)
+            print(f"Validation Epoch {epoch + 1}/{30}, Accuracy: {acc:.4f}")
 
