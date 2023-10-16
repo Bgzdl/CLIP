@@ -14,12 +14,6 @@ class FeedforwardAdapter(nn.Module):
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, input_dim)
 
-        # Initialize weights and biases
-        self.fc1.weight.data.normal_(0, init_scale)
-        self.fc2.weight.data.normal_(0, init_scale)
-        self.fc1.bias.data.fill_(0)
-        self.fc2.bias.data.fill_(0)
-
     def forward(self, x):
         # First linear transformation
         net = self.fc1(x)

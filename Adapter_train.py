@@ -28,7 +28,7 @@ class InfoNCE_loss(nn.Module):
 # train
 def train(model, dataloader, criterion, optimizer, embed, epoch):
     running_loss = 0.0
-    for dictionary in tqdm(train_dataloader, desc=f"Epoch {epoch + 1}/{30}"):
+    for dictionary in tqdm(train_dataloader, desc=f"Epoch {epoch+1}/{30}"):
         optimizer.zero_grad()
         I, T, labels = dictionary['data'], dictionary['target'], dictionary['label']
         I = torch.tensor(np.stack(I)).cuda()
@@ -145,3 +145,4 @@ for epoch in range(epoches):
         with torch.no_grad():
             acc = evaluate(model, val_dataloader, model.embed)
             print(f"Validation Epoch {epoch + 1}/{30}, Accuracy: {acc:.4f}")
+
