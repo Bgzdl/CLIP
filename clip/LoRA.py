@@ -83,6 +83,8 @@ class LoRA_CLIP(nn.Module):
         self.origin_model.transformer.resblocks = new_model
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
+        for param in self.Biobert.parameters():
+            param.requires_grad = False
 
     def encode_image(self, image):
         image_feature = self.origin_model.encode_image(image)

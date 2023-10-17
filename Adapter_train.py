@@ -11,6 +11,8 @@ from dataset.dataset import Patch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 class InfoNCE_loss(nn.Module):
     def __init__(self, t):
@@ -28,9 +30,10 @@ class InfoNCE_loss(nn.Module):
 # train
 def train(model, dataloader, criterion, optimizer, embed, epoch):
     running_loss = 0.0
-    for dictionary in tqdm(train_dataloader, desc=f"Epoch {epoch+1}/{30}"):
+    for dictionary in tqdm(train_dataloader, desc=f"Epoch {epoch + 1}/{30}"):
         optimizer.zero_grad()
         I, T, labels = dictionary['data'], dictionary['target'], dictionary['label']
+        labels.to(device)
         I = torch.tensor(np.stack(I)).cuda()
         if embed == embedMethod.clip:
             T = clip.tokenize([desc for desc in T]).cuda()
@@ -105,8 +108,6 @@ elif Optimization == 'LoRA':
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 if torch.cuda.device_count() > 1:
@@ -145,4 +146,3 @@ for epoch in range(epoches):
         with torch.no_grad():
             acc = evaluate(model, val_dataloader, model.embed)
             print(f"Validation Epoch {epoch + 1}/{30}, Accuracy: {acc:.4f}")
-
