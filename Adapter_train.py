@@ -19,30 +19,34 @@ class InfoNCE_loss(nn.Module):
         super(InfoNCE_loss, self).__init__()
         self.t = t
 
-    def forward(self, logits_per_image, logits_per_text, labels):
+    def forward(self, similarity, labels):
         criterion = nn.CrossEntropyLoss()
-        loss_i = criterion(logits_per_image, labels)
-        loss_t = criterion(logits_per_text, labels)
-        loss = (loss_i + loss_t) / 2
+        loss = criterion(similarity, labels)
         return loss
 
 
 # train
 def train(model, dataloader, criterion, optimizer, embed, epoch):
     running_loss = 0.0
+    T = ['Well differentiated tubular adenocarcinoma',
+         'Moderately differentiated tubular adenocarcinoma',
+         'Poorly differentiated adenocarcinoma']
+    if embed == embedMethod.clip:
+        T = clip.tokenize([desc for desc in T]).cuda()
+    elif embed == embedMethod.bio_bert:
+        T = bert.tokenize([desc for desc in T]).cuda()
+    else:
+        raise Exception("Val Token Error")
+    text_features = model.encode_text(T).float()
+    text_features /= text_features.norm(dim=-1, keepdim=True)
     for dictionary in tqdm(train_dataloader, desc=f"Epoch {epoch + 1}/{30}"):
         optimizer.zero_grad()
-        I, T, labels = dictionary['data'], dictionary['target'], dictionary['label']
-        labels.to(device)
+        I, labels = dictionary['data'], dictionary['label']
         I = torch.tensor(np.stack(I)).cuda()
-        if embed == embedMethod.clip:
-            T = clip.tokenize([desc for desc in T]).cuda()
-        elif embed == embedMethod.bio_bert:
-            T = bert.tokenize([desc for desc in T]).cuda()
-        else:
-            raise Exception('Train Token Error')
-        logits_per_image, logits_per_text = model(I, T)
-        loss = criterion(logits_per_image, logits_per_text, labels)
+        image_features = model.encode_image(I).float()
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+        similarity = text_features.cpu().numpy() @ image_features.cpu().numpy().T
+        loss = criterion(similarity, labels)
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
@@ -109,6 +113,8 @@ else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
 model.to(device)
+for name, param in model.named_parameters():
+    print(f'{name}: {param.requires_grad}')
 
 if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model)
