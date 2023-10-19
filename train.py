@@ -93,7 +93,7 @@ def evaluate(model, dataloader, embed: embedMethod):
         raise Exception("Val Token Error")
     text_features = model.encode_text(T).float()
     text_features /= text_features.norm(dim=-1, keepdim=True)
-    for dictionary in tqdm(dataloader):
+    for i, dictionary in enumerate(tqdm(dataloader)):
         I = dictionary['data']
         I = torch.tensor(np.stack(I)).cuda()
         label = dictionary['label']
@@ -103,6 +103,7 @@ def evaluate(model, dataloader, embed: embedMethod):
         predict = get_max_indices(similarity.T)
         total += len(predict)
         predict, label = np.array(predict), np.array(label)
+        predict_logger.info(f"Epoch: {epoch + 1}, batch: {i+1},  Predict: {predict}")
         comparision = predict == label
         correct += np.sum(comparision)
 
@@ -115,7 +116,7 @@ _, transform = clip.load(model_name)
 print(transform)
 print(model_name)
 Optimization = 'Adapter'  # model_name = ['Adapter', 'LoRA']
-embed = embedMethod.bio_bert
+embed = embedMethod.clip
 if Optimization == 'Adapter':
     model = Adapter_CLIP(embed, model_name)
 elif Optimization == 'LoRA':
@@ -141,7 +142,7 @@ print('Quantity of various categories is', count_0, count_1, count_2)
 train_dataset, val_dataset, test_dataset = dataset.split()
 
 train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=8)
-val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=True, num_workers=8)
+val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=8)
 print('finish')
 
 # 优化器
@@ -154,6 +155,10 @@ epoches = 30
 train_logger = logging.getLogger('train')
 train_logger.setLevel(logging.INFO)
 train_logger.addHandler(logging.FileHandler('train.txt', mode='w'))  # 将日志输出到txt文件
+
+predict_logger = logging.getLogger('predict')
+predict_logger.setLevel(logging.INFO)
+predict_logger.addHandler(logging.FileHandler('predict.txt', mode='w'))  # 将日志输出到txt文件
 
 running_logger = logging.getLogger('running')
 running_logger.setLevel(logging.INFO)
