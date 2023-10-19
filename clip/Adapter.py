@@ -8,7 +8,7 @@ from biobert.biobert import bert_token_embedding
 
 
 class FeedforwardAdapter(nn.Module):
-    def __init__(self, input_dim, hidden_dim=64, init_scale=1e-3):
+    def __init__(self, input_dim, hidden_dim=64):
         super(FeedforwardAdapter, self).__init__()
 
         self.fc1 = nn.Linear(input_dim, hidden_dim)
@@ -48,7 +48,7 @@ class AdapterResidualAttentionBlock(nn.Module):
         x = self.adapter_layer_1(x)
         x = x + self.pretrained_model.mlp(self.pretrained_model.ln_2(x))
         x = self.adapter_layer_2(x)
-        x = self.ln_3(x)
+        # x = self.ln_3(x)
         return x
 
 

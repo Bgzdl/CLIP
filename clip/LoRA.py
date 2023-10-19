@@ -8,11 +8,11 @@ from biobert.biobert import bert_token_embedding
 
 class LoRALayer():
     def __init__(
-        self,
-        r: int,
-        lora_alpha: int,
-        lora_dropout: float,
-        merge_weights: bool,
+            self,
+            r: int,
+            lora_alpha: int,
+            lora_dropout: float,
+            merge_weights: bool,
     ):
         self.r = r
         self.lora_alpha = lora_alpha
@@ -124,3 +124,41 @@ class LoRA_CLIP(nn.Module):
 
         # shape = [global_batch_size, global_batch_size]
         return logits_per_image, logits_per_text
+
+
+class Simple_LoRA_CLIP(nn.Module):
+    def __init__(self, embed: embedMethod, model_name):
+        super().__init__()
+        self.name = model_name
+        self.origin_model, _ = clip.load(model_name)
+        for param in self.origin_model.parameters():
+            param.requires_grad = False
+        self.Lora = LoRA(224*224*3, 768, 8)
+        self.embed = embed
+        self.Biobert = bert_token_embedding(self.name)
+        for param in self.Biobert.parameters():
+            param.requires_grad = False
+
+    def encode_image(self, image):
+        image_feature = self.origin_model.visual(image.type(self.origin_model.dtype))
+        lora_feature = self.Lora(image)
+        return image_feature + lora_feature
+
+    def encode_text(self, text):
+        if self.embed == embedMethod.clip:
+            x = self.origin_model.encode_text(text)
+            return x
+        elif self.embed == embedMethod.bio_bert:
+            x = self.Biobert(text)  # [batch_size, n_ctx, d_model]
+            x = x + self.origin_model.positional_embedding.type(self.origin_model.dtype)
+            x = x.permute(1, 0, 2)  # NLD -> LND
+            x = self.origin_model.transformer(x)
+            x = x.permute(1, 0, 2)  # LND -> NLD
+            x = self.origin_model.ln_final(x).type(self.origin_model.dtype)
+
+            # x.shape = [batch_size, n_ctx, transformer.width]
+            # take features from the eot embedding (eot_token is the highest number in each sequence)
+            x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.origin_model.text_projection
+            return x
+        else:
+            raise Exception('Embedding Error')
