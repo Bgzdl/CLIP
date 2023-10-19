@@ -22,9 +22,10 @@ class InfoNCE_loss(nn.Module):
     def forward(self, similarity, labels):
         criterion = nn.CrossEntropyLoss()
         similarity = similarity * np.exp(self.t)
+        if torch.any(similarity == 0):
+            raise Exception('Similarity norm appear zeros')
         similarity = similarity + 1e-6
         loss = criterion(similarity.T, labels)
-        print(labels)
         return loss
 
 
@@ -42,7 +43,7 @@ def train(model, dataloader, criterion, optimizer, embed, epoch):
         raise Exception("Val Token Error")
     text_features = model.encode_text(T).float()
     if torch.any(text_features.norm(dim=-1, keepdim=True) == 0):
-        raise Exception('Image feature norm appear zeros')
+        raise Exception('Text feature norm appear zeros')
     text_features /= text_features.norm(dim=-1, keepdim=True)
     for i, dictionary in enumerate(tqdm(train_dataloader, desc=f"Epoch {epoch + 1}/{30}")):
         optimizer.zero_grad()
@@ -139,8 +140,8 @@ count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
 print('Quantity of various categories is', count_0, count_1, count_2)
 train_dataset, val_dataset, test_dataset = dataset.split()
 
-train_dataloader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=8)
-val_dataloader = DataLoader(val_dataset, batch_size=64, shuffle=True, num_workers=8)
+train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=8)
+val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=True, num_workers=8)
 print('finish')
 
 # 优化器
@@ -158,12 +159,10 @@ running_logger = logging.getLogger('running')
 running_logger.setLevel(logging.INFO)
 running_logger.addHandler(logging.FileHandler('running.txt', mode='w'))  # 将日志输出到txt文件
 
-
 for epoch in range(epoches):
     torch.cuda.empty_cache()
     with torch.autocast("cuda"):
         model.train()
-        logging.basicConfig(filename='train_log.txt', level=logging.INFO)
         train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed, epoch)
         print(f"Train Epoch {epoch + 1}/{30}, Average Loss: {train_loss:.4f}")
         scheduler.step()
