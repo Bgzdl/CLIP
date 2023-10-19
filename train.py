@@ -3,7 +3,7 @@ import torch.optim as optim
 import numpy as np
 import torch.nn as nn
 import clip
-from clip.LoRA import LoRA_CLIP, embedMethod
+from clip.LoRA import LoRA_CLIP, Simple_LoRA_CLIP, embedMethod
 import logging
 from biobert.biobert import bert
 from clip.Adapter import Adapter_CLIP

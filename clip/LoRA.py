@@ -87,7 +87,7 @@ class LoRA_CLIP(nn.Module):
             param.requires_grad = False
 
     def encode_image(self, image):
-        image_feature = self.origin_model.encode_image(image)
+        image_feature = self.origin_model.visual(image.type(self.origin_model.dtype))
         return image_feature
 
     def encode_text(self, text):

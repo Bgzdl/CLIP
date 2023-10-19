@@ -72,7 +72,7 @@ class Adapter_CLIP(nn.Module):
             param.requires_grad = False
 
     def encode_image(self, image):
-        return self.origin_model.encode_image(image)
+        return self.origin_model.visual(image.type(self.origin_model.dtype))
 
     def encode_text(self, text):
         if self.embed == embedMethod.clip:
