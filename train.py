@@ -4,12 +4,14 @@ import numpy as np
 import torch.nn as nn
 import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
-# tokenizer
+import logging
 from biobert.biobert import bert
 from clip.Adapter import Adapter_CLIP
 from dataset.dataset import Patch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class InfoNCE_loss(nn.Module):
@@ -19,7 +21,10 @@ class InfoNCE_loss(nn.Module):
 
     def forward(self, similarity, labels):
         criterion = nn.CrossEntropyLoss()
-        loss = criterion(similarity, labels)
+        similarity = similarity * np.exp(self.t)
+        similarity = similarity + 1e-6
+        loss = criterion(similarity.T, labels)
+        print(labels)
         return loss
 
 
@@ -36,18 +41,24 @@ def train(model, dataloader, criterion, optimizer, embed, epoch):
     else:
         raise Exception("Val Token Error")
     text_features = model.encode_text(T).float()
+    if torch.any(text_features.norm(dim=-1, keepdim=True) == 0):
+        raise Exception('Image feature norm appear zeros')
     text_features /= text_features.norm(dim=-1, keepdim=True)
-    for dictionary in tqdm(train_dataloader, desc=f"Epoch {epoch + 1}/{30}"):
+    for i, dictionary in enumerate(tqdm(train_dataloader, desc=f"Epoch {epoch + 1}/{30}")):
         optimizer.zero_grad()
         I, labels = dictionary['data'], dictionary['label']
+        labels = labels.cuda()
         I = torch.tensor(np.stack(I)).cuda()
         image_features = model.encode_image(I).float()
-        image_features /= image_features.norm(dim=-1, keepdim=True)
-        similarity = text_features.cpu().numpy() @ image_features.cpu().numpy().T
+        if torch.any(image_features.norm(dim=-1, keepdim=True) == 0):
+            raise Exception('Image feature norm appear zeros')
+        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+        similarity = torch.mm(text_features, image_features.T)
         loss = criterion(similarity, labels)
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
+        train_logger.info(f"Epoch: {epoch + 1}, batch: {i+1}, Train Loss: {loss.item():.8f}")
 
     return running_loss / len(dataloader)
 
@@ -100,6 +111,7 @@ def evaluate(model, dataloader, embed: embedMethod):
 # 模型准备
 model_name = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
 _, transform = clip.load(model_name)
+print(transform)
 print(model_name)
 Optimization = 'Adapter'  # model_name = ['Adapter', 'LoRA']
 embed = embedMethod.bio_bert
@@ -110,8 +122,6 @@ elif Optimization == 'LoRA':
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 if torch.cuda.device_count() > 1:
@@ -129,8 +139,8 @@ count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
 print('Quantity of various categories is', count_0, count_1, count_2)
 train_dataset, val_dataset, test_dataset = dataset.split()
 
-train_dataloader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=8)
-val_dataloader = DataLoader(val_dataset, batch_size=256, shuffle=True, num_workers=8)
+train_dataloader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=8)
+val_dataloader = DataLoader(val_dataset, batch_size=64, shuffle=True, num_workers=8)
 print('finish')
 
 # 优化器
@@ -139,14 +149,26 @@ decayRate = 0.96
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
 epoches = 30
 
+# 日志文件
+train_logger = logging.getLogger('train')
+train_logger.setLevel(logging.INFO)
+train_logger.addHandler(logging.FileHandler('train.txt', mode='w'))  # 将日志输出到txt文件
+
+running_logger = logging.getLogger('running')
+running_logger.setLevel(logging.INFO)
+running_logger.addHandler(logging.FileHandler('running.txt', mode='w'))  # 将日志输出到txt文件
+
+
 for epoch in range(epoches):
     torch.cuda.empty_cache()
     with torch.autocast("cuda"):
         model.train()
+        logging.basicConfig(filename='train_log.txt', level=logging.INFO)
         train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed, epoch)
         print(f"Train Epoch {epoch + 1}/{30}, Average Loss: {train_loss:.4f}")
         scheduler.step()
         model.eval()
         with torch.no_grad():
             acc = evaluate(model, val_dataloader, model.embed)
-            print(f"Validation Epoch {epoch + 1}/{30}, Accuracy: {acc:.4f}")
+            print(f"Validation Epoch {epoch + 1}/{30}, Accuracy: {acc:.8f}")
+        running_logger.info(f"Epoch: {epoch + 1}, Running Loss: {train_loss:.8f}, acc: {acc:.8f}")
