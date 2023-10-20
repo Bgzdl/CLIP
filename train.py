@@ -148,7 +148,7 @@ epoches = 30
 # 日志文件
 train_logger = logging.getLogger('train')
 train_logger.setLevel(logging.INFO)
-train_logger.addHandler(logging.FileHandler('train.txt', mode='w'))  # 将日志输出到txt文件
+train_logger.addHandler(logging.FileHandler('train_loss.txt', mode='w'))  # 将日志输出到txt文件
 
 predict_logger = logging.getLogger('predict')
 predict_logger.setLevel(logging.INFO)
@@ -156,7 +156,7 @@ predict_logger.addHandler(logging.FileHandler('predict.txt', mode='w'))  # 将�
 
 running_logger = logging.getLogger('running')
 running_logger.setLevel(logging.INFO)
-running_logger.addHandler(logging.FileHandler('running.txt', mode='w'))  # 将日志输出到txt文件
+running_logger.addHandler(logging.FileHandler('result.txt', mode='w'))  # 将日志输出到txt文件
 
 best_acc = 0.0
 best_epoch = 0
