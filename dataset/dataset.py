@@ -1,8 +1,6 @@
-import torch
 import os
 from torch.utils.data import Dataset
 import pandas as pd
-from torchvision import transforms
 from PIL import Image
 
 label_dict = {'Well differentiated tubular adenocarcinoma': 0,
@@ -107,11 +105,11 @@ class Patch(Dataset):
 
     def split(self):
         length = len(self.data)
-        train = sub_Patch(self.data[:int(length * 0.8)], self.target[:int(length * 0.8)],
-                          self.label[:int(length * 0.8)], self.load, self.transform)
-        val = sub_Patch(self.data[int(length * 0.8):int(length * 0.98)],
-                        self.target[int(length * 0.8):int(length * 0.98)],
-                        self.label[int(length * 0.8):int(length * 0.98)], self.load, self.transform)
+        train = sub_Patch(self.data[:int(length * 0.2)], self.target[:int(length * 0.2)],
+                          self.label[:int(length * 0.2)], self.load, self.transform)
+        val = sub_Patch(self.data[int(length * 0.2):int(length * 0.98)],
+                        self.target[int(length * 0.2):int(length * 0.98)],
+                        self.label[int(length * 0.2):int(length * 0.98)], self.load, self.transform)
         test = sub_Patch(self.data[int(length * 0.98):], self.target[int(length * 0.98):],
                          self.label[int(length * 0.98):], self.load, self.transform)
         return [train, val, test]

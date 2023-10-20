@@ -177,5 +177,5 @@ for epoch in range(epoches):
     if acc > best_acc:
         best_acc = acc
         best_epoch = epoch
-        torch.save(model.state_dict(), "best_model.pth")
+        torch.save(model.state_dict(), f"best_model_{best_acc:.8f}.pth")
         print(f"Best model saved at epoch {epoch + 1}, acc: {best_acc:.8f}")
