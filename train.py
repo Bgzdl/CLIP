@@ -22,8 +22,6 @@ class InfoNCE_loss(nn.Module):
     def forward(self, similarity, labels):
         criterion = nn.CrossEntropyLoss()
         similarity = similarity * np.exp(self.t)
-        if torch.any(similarity == 0):
-            raise Exception('Similarity norm appear zeros')
         similarity = similarity + 1e-6
         loss = criterion(similarity.T, labels)
         return loss
@@ -42,8 +40,6 @@ def train(model, dataloader, criterion, optimizer, embed, epoch):
     else:
         raise Exception("Val Token Error")
     text_features = model.encode_text(T).float()
-    if torch.any(text_features.norm(dim=-1, keepdim=True) == 0):
-        raise Exception('Text feature norm appear zeros')
     text_features /= text_features.norm(dim=-1, keepdim=True)
     for i, dictionary in enumerate(tqdm(train_dataloader, desc=f"Epoch {epoch + 1}/{30}")):
         optimizer.zero_grad()
@@ -51,8 +47,6 @@ def train(model, dataloader, criterion, optimizer, embed, epoch):
         labels = labels.cuda()
         I = torch.tensor(np.stack(I)).cuda()
         image_features = model.encode_image(I).float()
-        if torch.any(image_features.norm(dim=-1, keepdim=True) == 0):
-            raise Exception('Image feature norm appear zeros')
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         similarity = torch.mm(text_features, image_features.T)
         loss = criterion(similarity, labels)
@@ -115,7 +109,7 @@ model_name = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
 _, transform = clip.load(model_name)
 print(transform)
 print(model_name)
-Optimization = 'Adapter'  # model_name = ['Adapter', 'LoRA']
+Optimization = 'LoRA'  # model_name = ['Adapter', 'LoRA']
 embed = embedMethod.clip
 if Optimization == 'Adapter':
     model = Adapter_CLIP(embed, model_name)
@@ -164,6 +158,8 @@ running_logger = logging.getLogger('running')
 running_logger.setLevel(logging.INFO)
 running_logger.addHandler(logging.FileHandler('running.txt', mode='w'))  # 将日志输出到txt文件
 
+best_acc = 0.0
+best_epoch = 0
 for epoch in range(epoches):
     torch.cuda.empty_cache()
     with torch.autocast("cuda"):
@@ -176,3 +172,10 @@ for epoch in range(epoches):
             acc = evaluate(model, val_dataloader, model.embed)
             print(f"Validation Epoch {epoch + 1}/{30}, Accuracy: {acc:.8f}")
         running_logger.info(f"Epoch: {epoch + 1}, Running Loss: {train_loss:.8f}, acc: {acc:.8f}")
+
+    # 如果验证正确率高于当前最佳正确率，则保存模型参数
+    if acc > best_acc:
+        best_acc = acc
+        best_epoch = epoch
+        torch.save(model.state_dict(), "best_model.pth")
+        print(f"Best model saved at epoch {epoch + 1}, acc: {best_acc:.8f}")

@@ -65,7 +65,7 @@ class LoraResidualAttentionBlock(nn.Module):
         lora_features = self.LoRA(x)
         x = x + self.origin_model.attention(self.origin_model.ln_1(x))
         x = x + self.origin_model.mlp(self.origin_model.ln_2(x))
-        x += lora_features
+        x = lora_features + x
         return x
 
 
@@ -77,10 +77,10 @@ class LoRA_CLIP(nn.Module):
         for param in self.origin_model.parameters():
             param.requires_grad = False
         new_model = []
-        for block in self.origin_model.transformer.resblocks:
+        for block in self.origin_model.visual.transformer.resblocks:
             new_model.append(LoraResidualAttentionBlock(block, block.d_model))
         new_model = nn.Sequential(*new_model)
-        self.origin_model.transformer.resblocks = new_model
+        self.origin_model.visual.transformer.resblocks = new_model
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
         for param in self.Biobert.parameters():
