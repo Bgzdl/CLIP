@@ -10,9 +10,8 @@ label_dict = {'Well differentiated tubular adenocarcinoma': 0,
 
 
 class Few_shot_train(Dataset):
-    def __init__(self, path, label_type: bool, transform=None, load=False, shot_num: int = 1):
+    def __init__(self, path, transform=None, load=False, shot_num: int = 1):
         self.data_information = pd.read_csv(os.path.join(path, 'captions.csv'))
-        self.label_type = label_type
         self.shot_num = shot_num
         self.data = []
         self.target = []

@@ -2,6 +2,7 @@ import os
 from torch.utils.data import Dataset
 import pandas as pd
 from PIL import Image
+import random
 
 label_dict = {'Well differentiated tubular adenocarcinoma': 0,
               'Moderately differentiated tubular adenocarcinoma': 1,
@@ -104,6 +105,12 @@ class Patch(Dataset):
         return len(self.data)
 
     def split(self):
+        # shuffle
+        indices = list(range(len(self.data)))
+        random.shuffle(indices)
+        self.data = [self.data[i] for i in indices]
+        self.target = [self.target[i] for i in indices]
+        self.label = [self.label[i] for i in indices]
         length = len(self.data)
         train = sub_Patch(self.data[:int(length * 0.2)], self.target[:int(length * 0.2)],
                           self.label[:int(length * 0.2)], self.load, self.transform)
