@@ -2,16 +2,15 @@ import os
 import torch
 import torch.optim as optim
 import torch.nn as nn
-import sys
 import clip
+from torch.utils.data import DataLoader
+from function import train, evaluate, save_model
+import sys
+sys.path.append('..')
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
 from dataset.dataset import Patch
 from loss.InfoNCE import InfoNCE_loss
-from torch.utils.data import DataLoader
-from function import train, evaluate, save_model
-
-sys.path.append('..')
 from log.log import train_logger, predict_logger, running_logger
 from parse.parser import parser
 

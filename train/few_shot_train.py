@@ -2,17 +2,18 @@ import os.path
 import torch
 import torch.optim as optim
 import torch.nn as nn
-import sys
-
+from torch.utils.data import DataLoader
 import clip
+from function import train, evaluate, save_model
+import sys
+sys.path.append('..')
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
 from loss.InfoNCE import InfoNCE_loss
 from dataset.few_shot_dataset import Few_shot_train, Few_shot_val
-from torch.utils.data import DataLoader
-from function import train, evaluate, save_model
 
-sys.path.append('..')
+
+
 from parse.few_shot_parser import parser
 
 # 设备准备
