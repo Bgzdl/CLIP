@@ -2,7 +2,8 @@ import os.path
 import torch
 import torch.optim as optim
 import torch.nn as nn
-from parse.few_shot_parser import parser
+import sys
+
 import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
@@ -10,6 +11,9 @@ from loss.InfoNCE import InfoNCE_loss
 from dataset.few_shot_dataset import Few_shot_train, Few_shot_val
 from torch.utils.data import DataLoader
 from function import train, evaluate, save_model
+
+sys.path.append('..')
+from parse.few_shot_parser import parser
 
 # 设备准备
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -63,7 +67,7 @@ optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
 
 # 日志
-from ..log.few_shot_log import train_logger, predict_logger, running_logger
+from log.few_shot_log import train_logger, predict_logger, running_logger
 
 
 for epoch in range(epoches):

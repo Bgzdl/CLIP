@@ -2,7 +2,7 @@ import os
 import torch
 import torch.optim as optim
 import torch.nn as nn
-from parse.parser import parser
+import sys
 import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
@@ -10,7 +10,10 @@ from dataset.dataset import Patch
 from loss.InfoNCE import InfoNCE_loss
 from torch.utils.data import DataLoader
 from function import train, evaluate, save_model
+
+sys.path.append('..')
 from log.log import train_logger, predict_logger, running_logger
+from parse.parser import parser
 
 # 设备准备
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -47,7 +50,6 @@ if torch.cuda.device_count() > 1:
 
 # loss
 infonce_loss = InfoNCE_loss(temperature).cuda()
-
 
 # 数据集
 print('preparing dataset')
