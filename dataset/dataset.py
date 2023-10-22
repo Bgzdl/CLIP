@@ -18,7 +18,7 @@ class sub_Patch(Dataset):
         self.load = load
         self.transform = transform
 
-    def load_img(self,img_path):
+    def load_img(self, img_path):
         image = Image.open(img_path).convert("RGB")
         if self.transform is not None:
             image = self.transform(image)

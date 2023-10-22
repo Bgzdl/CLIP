@@ -19,11 +19,11 @@ class Few_shot_train(Dataset):
         self.path = path
         self.transform = transform
         self.load = load
-        groups = self.Count_number_of_statistical_group()
+        self.groups = self.Count_number_of_statistical_group()
         if self.load:
-            self.preprocess(groups)
+            self.preprocess(self.groups)
         else:
-            self.load_img_path(groups)
+            self.load_img_path(self.groups)
 
     def load_img(self, img_path):
         image = Image.open(img_path).convert("RGB")
@@ -119,7 +119,7 @@ class Few_shot_train(Dataset):
         def get_keys_with_max_n_chars(dictionary, n):
             result = []
             for key, value in dictionary.items():
-                result.append((key[:n], value))
+                result.append((key, value))
             result.sort(key=lambda x: x[1], reverse=True)
             return [key for key, value in result[:n]]
 
@@ -172,7 +172,7 @@ class Few_shot_val(Dataset):
         def get_keys_with_max_n_chars(dictionary, n):
             result = []
             for key, value in dictionary.items():
-                result.append((key[:n], value))
+                result.append((key, value))
             result.sort(key=lambda x: x[1], reverse=True)
             return [key for key, value in result[:n]]
 
