@@ -2,7 +2,7 @@ import os.path
 import torch
 import torch.optim as optim
 import torch.nn as nn
-from ..parser.few_shot_parser import parser
+from parse.few_shot_parser import parser
 import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
