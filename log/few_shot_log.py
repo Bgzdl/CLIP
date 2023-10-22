@@ -2,8 +2,9 @@ import logging
 import os
 from train.few_shot_train import shot_num
 
-save_path = f"./few_shot/{shot_num}"
-
+save_path = f"../log/few_shot/{shot_num}"
+if not os.path.exists(save_path):
+    os.makedirs(save_path)
 train_logger = logging.getLogger('train')
 train_logger.setLevel(logging.INFO)
 train_path = os.path.join(save_path, 'train_loss.txt')

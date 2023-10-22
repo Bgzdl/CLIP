@@ -5,7 +5,7 @@ from transformers import BertTokenizer, BertModel, BertForNextSentencePrediction
 
 class bert_token:
     def __init__(self):
-        self.tokenizer = BertTokenizer.from_pretrained('./biobert-base-cased-v1.2')
+        self.tokenizer = BertTokenizer.from_pretrained('../biobert-base-cased-v1.2')
 
     def tokenize(self, text: list):
         outputs = self.tokenizer(text, padding='max_length', max_length=77, return_tensors='pt')
@@ -20,10 +20,10 @@ class bert_token_embedding(nn.Module):
     def __init__(self, model_name):
         super().__init__()
         self.name = model_name
-        model_config = BertConfig.from_pretrained('./biobert-base-cased-v1.2')
+        model_config = BertConfig.from_pretrained('../biobert-base-cased-v1.2')
         model_config.output_hidden_states = True
         model_config.output_attentions = True
-        self.bert_model = BertModel.from_pretrained('./biobert-base-cased-v1.2', config=model_config)
+        self.bert_model = BertModel.from_pretrained('../biobert-base-cased-v1.2', config=model_config)
         for param in self.bert_model.parameters():
             param.require_grad = False
         self.adaptive_layer = nn.Linear(768, 512)
