@@ -3,7 +3,7 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from function import train, evaluate, save_model
+import logging
 import sys
 sys.path.append('../clip')
 import clip
@@ -11,6 +11,7 @@ from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
 from loss.InfoNCE import InfoNCE_loss
 from dataset.few_shot_dataset import Few_shot_train, Few_shot_val
+from function import train, evaluate, save_model
 from parse.few_shot_parser import parser
 
 # 设备准备
@@ -65,7 +66,24 @@ optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
 
 # 日志
-from log.few_shot_log import train_logger, predict_logger, running_logger
+save_path = f"../log/few_shot/{shot_num}"
+if not os.path.exists(save_path):
+    os.makedirs(save_path)
+train_logger = logging.getLogger('train')
+train_logger.setLevel(logging.INFO)
+train_path = os.path.join(save_path, 'train_loss.txt')
+train_logger.addHandler(logging.FileHandler(train_path, mode='w'))  # 将日志输出到txt文件
+
+predict_logger = logging.getLogger('predict')
+predict_logger.setLevel(logging.INFO)
+predict_path = os.path.join(save_path, 'predict.txt')
+predict_logger.addHandler(logging.FileHandler(predict_path, mode='w'))  # 将日志输出到txt文件
+
+running_logger = logging.getLogger('running')
+running_logger.setLevel(logging.INFO)
+running_path = os.path.join(save_path, 'result.txt')
+running_logger.addHandler(logging.FileHandler(running_path, mode='w'))  # 将日志输出到txt文件
+
 
 for epoch in range(epoches):
     torch.cuda.empty_cache()
@@ -84,6 +102,6 @@ for epoch in range(epoches):
     if acc > best_acc:
         best_acc = acc
         best_epoch = epoch
-        save_path = os.path.join('model', 'few_shot', str(shot_num))
+        save_path = os.path.join('../model', 'few_shot', str(shot_num))
         save_model(model, save_path, best_acc)
         print(f"Best model saved at epoch {epoch + 1}, acc: {best_acc:.8f}")
