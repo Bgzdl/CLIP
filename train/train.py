@@ -69,7 +69,7 @@ optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
 
 # 日志文件
-save_path = "../log/all"
+save_path = "./log/all"
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
