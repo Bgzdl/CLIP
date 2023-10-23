@@ -1,10 +1,21 @@
 import torch
 import numpy as np
-from clip.LoRA import embedMethod
-import clip
+# import clip
 from tqdm import tqdm
-from biobert.biobert import bert
+
 import os
+import sys
+from pathlib import Path
+
+# import clip.LoRA
+
+LORA_PATH = Path(__file__).resolve().parents[1]
+sys.path.append(str(LORA_PATH))
+# print(clip)
+# embedMethod = clip.LoRA.embedMethod
+
+from clip.LoRA import embedMethod
+from biobert.biobert import bert
 
 
 # train

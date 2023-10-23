@@ -3,17 +3,14 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 from torch.utils.data import DataLoader
-import clip
 from function import train, evaluate, save_model
 import sys
-sys.path.append('..')
+sys.path.append('../clip')
+import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
 from loss.InfoNCE import InfoNCE_loss
 from dataset.few_shot_dataset import Few_shot_train, Few_shot_val
-
-
-
 from parse.few_shot_parser import parser
 
 # 设备准备
@@ -69,7 +66,6 @@ scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=de
 
 # 日志
 from log.few_shot_log import train_logger, predict_logger, running_logger
-
 
 for epoch in range(epoches):
     torch.cuda.empty_cache()
