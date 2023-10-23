@@ -3,7 +3,6 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from function import train, evaluate, save_model
 import logging
 import sys
 current_path = os.path.abspath(__file__)
@@ -13,6 +12,7 @@ sys.path.append(parent_directory)
 import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
+from function import train, evaluate, save_model
 from dataset.dataset import Patch
 from loss.InfoNCE import InfoNCE_loss
 from parse.parser import parser
