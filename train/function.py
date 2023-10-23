@@ -1,11 +1,7 @@
 import torch
 import numpy as np
-
 from tqdm import tqdm
-
 import os
-import sys
-sys.path.append('../clip')
 import clip
 from clip.LoRA import embedMethod
 from biobert.biobert import bert

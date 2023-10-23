@@ -6,7 +6,10 @@ from torch.utils.data import DataLoader
 from function import train, evaluate, save_model
 import logging
 import sys
-sys.path.append('../clip')
+current_path = os.path.abspath(__file__)
+current_directory = os.path.dirname(current_path)
+parent_directory = os.path.dirname(current_directory)
+sys.path.append(parent_directory)
 import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
