@@ -2,7 +2,7 @@
 
 epoches='5'
 batch_size='32'
-lr='0.00001'
+lr='0.0001'
 temperature='0.01'
 decayRate='0.8'
 shot_nums=('1' '2' '4' '8' '16')
@@ -14,3 +14,5 @@ for shot_num in "${shot_nums[@]}"; do
     # 调用Python脚本并传入参数
     python "$python_script" "$epoches" "$batch_size" "$lr" "$temperature" "$decayRate" "$shot_num"
 done
+
+shutdown -h now

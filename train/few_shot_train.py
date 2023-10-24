@@ -105,6 +105,6 @@ for epoch in range(epoches):
     if acc > best_acc:
         best_acc = acc
         best_epoch = epoch
-        save_path = os.path.join('../model', 'few_shot', str(shot_num))
+        save_path = os.path.join('./model', 'few_shot', str(shot_num))
         save_model(model, save_path, best_acc)
         print(f"Best model saved at epoch {epoch + 1}, acc: {best_acc:.8f}")
