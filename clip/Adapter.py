@@ -18,17 +18,17 @@ class FeedforwardAdapter(nn.Module):
         # First linear transformation
         net = self.fc1(x)
         net = F.gelu(net)  # Apply GELU activation
-
         # Second linear transformation
         net = self.fc2(net)
-
         # Residual connection
         net += x
-
         return net
 
 
-class AdapterResidualAttentionBlock(nn.Module):
+class AdapterResidualAttentionBlock_1(nn.Module):
+    """
+    Adapter
+    """
     def __init__(self, origin_model: nn.Module):
         super().__init__()
         self.pretrained_model = origin_model
@@ -52,6 +52,32 @@ class AdapterResidualAttentionBlock(nn.Module):
         return x
 
 
+class AdapterResidualAttentionBlock_2(nn.Module):
+    """
+    Parallel Adapter
+    """
+    def __init__(self, origin_model: nn.Module):
+        super().__init__()
+        self.pretrained_model = origin_model
+        d_model = origin_model.d_model
+        for param in self.pretrained_model.parameters():
+            param.requires_grad = False
+        self.adapter_layer_1 = FeedforwardAdapter(d_model)
+        for param in self.adapter_layer_1.parameters():
+            param.requires_grad = True
+        self.adapter_layer_2 = FeedforwardAdapter(d_model)
+        for param in self.adapter_layer_2.parameters():
+            param.requires_grad = True
+        self.ln_3 = LayerNorm(d_model)
+
+    def forward(self, x: torch.Tensor):
+        x = x + self.pretrained_model.attention(self.pretrained_model.ln_1(x))
+        x = self.pretrained_model.ln_2(x)
+        adapter_x = self.adapter_layer_1(x)
+        x = self.pretrained_model.mlp(x) + adapter_x
+        return x
+
+
 class Adapter_CLIP(nn.Module):
     def __init__(self, embed: embedMethod, model_name: str):
         super().__init__()
@@ -62,7 +88,7 @@ class Adapter_CLIP(nn.Module):
         # Add adapter to vision transformer
         new_visual_model = []
         for block in self.origin_model.visual.transformer.resblocks:
-            new_visual_model.append(AdapterResidualAttentionBlock(block))
+            new_visual_model.append(AdapterResidualAttentionBlock_2(block))
         new_visual_model = nn.Sequential(*new_visual_model)
         self.origin_model.visual.transformer.resblocks = new_visual_model
         # Embedding method

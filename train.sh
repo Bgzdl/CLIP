@@ -1,6 +1,6 @@
 #!/bin/bash
 
-epoches='5'
+epoches='30'
 batch_size='32'
 lr='0.0001'
 temperature='0.01'
