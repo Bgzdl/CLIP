@@ -58,8 +58,8 @@ infonce_loss = InfoNCE_loss(temperature).cuda()
 
 # 数据集
 print('preparing dataset')
-train_dataset = Few_shot_train('../data', transform, load=True, shot_num=shot_num)
-val_dataset = Few_shot_val('../data', transform, load=False, shot_num=shot_num)
+train_dataset = Few_shot_train('/root/autodl-tmp/patch', transform, load=True, shot_num=shot_num)
+val_dataset = Few_shot_val('/root/autodl-tmp/patch', transform, load=False, shot_num=shot_num)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 print('finish')

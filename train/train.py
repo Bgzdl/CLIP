@@ -36,7 +36,7 @@ best_epoch = 0
 model_name = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
 _, transform = clip.load(model_name)
 print(model_name)
-Optimization = 'LoRA'  # model_name = ['Adapter', 'LoRA']
+Optimization = 'Adapter'  # model_name = ['Adapter', 'LoRA']
 embed = embedMethod.clip
 if Optimization == 'Adapter':
     model = Adapter_CLIP(embed, model_name)
@@ -55,7 +55,7 @@ infonce_loss = InfoNCE_loss(temperature).cuda()
 
 # 数据集
 print('preparing dataset')
-dataset = Patch('./data', True, transform, load=False)  # '/root/autodl-tmp/patch' in autodl
+dataset = Patch('/root/autodl-tmp/patch', True, transform, load=False)  # '/root/autodl-tmp/patch' in autodl
 count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
 print('Quantity of various categories is', count_0, count_1, count_2)
 train_dataset, val_dataset, test_dataset = dataset.split()
