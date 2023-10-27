@@ -8,7 +8,7 @@ from biobert.biobert import bert_token_embedding
 
 
 class FeedforwardAdapter(nn.Module):
-    def __init__(self, input_dim, hidden_dim=64):
+    def __init__(self, input_dim, hidden_dim=16):
         super(FeedforwardAdapter, self).__init__()
 
         self.fc1 = nn.Linear(input_dim, hidden_dim)
@@ -21,38 +21,11 @@ class FeedforwardAdapter(nn.Module):
         # Second linear transformation
         net = self.fc2(net)
         # Residual connection
-        net += x
+        net = x + net
         return net
 
 
-class AdapterResidualAttentionBlock_1(nn.Module):
-    """
-    Adapter
-    """
-    def __init__(self, origin_model: nn.Module):
-        super().__init__()
-        self.pretrained_model = origin_model
-        d_model = origin_model.d_model
-        for param in self.pretrained_model.parameters():
-            param.requires_grad = False
-        self.adapter_layer_1 = FeedforwardAdapter(d_model)
-        for param in self.adapter_layer_1.parameters():
-            param.requires_grad = True
-        self.adapter_layer_2 = FeedforwardAdapter(d_model)
-        for param in self.adapter_layer_2.parameters():
-            param.requires_grad = True
-        self.ln_3 = LayerNorm(d_model)
-
-    def forward(self, x: torch.Tensor):
-        x = x + self.pretrained_model.attention(self.pretrained_model.ln_1(x))
-        x = self.adapter_layer_1(x)
-        x = x + self.pretrained_model.mlp(self.pretrained_model.ln_2(x))
-        x = self.adapter_layer_2(x)
-        # x = self.ln_3(x)
-        return x
-
-
-class AdapterResidualAttentionBlock_2(nn.Module):
+class AdapterResidualAttentionBlock(nn.Module):
     """
     Parallel Adapter
     """
@@ -62,18 +35,12 @@ class AdapterResidualAttentionBlock_2(nn.Module):
         d_model = origin_model.d_model
         for param in self.pretrained_model.parameters():
             param.requires_grad = False
-        self.adapter_layer_1 = FeedforwardAdapter(d_model)
-        for param in self.adapter_layer_1.parameters():
-            param.requires_grad = True
-        self.adapter_layer_2 = FeedforwardAdapter(d_model)
-        for param in self.adapter_layer_2.parameters():
-            param.requires_grad = True
-        self.ln_3 = LayerNorm(d_model)
+        self.adapter_layer = FeedforwardAdapter(d_model)
 
     def forward(self, x: torch.Tensor):
         x = x + self.pretrained_model.attention(self.pretrained_model.ln_1(x))
         x = self.pretrained_model.ln_2(x)
-        adapter_x = self.adapter_layer_1(x)
+        adapter_x = self.adapter_layer(x)
         x = self.pretrained_model.mlp(x) + adapter_x
         return x
 
@@ -88,7 +55,7 @@ class Adapter_CLIP(nn.Module):
         # Add adapter to vision transformer
         new_visual_model = []
         for block in self.origin_model.visual.transformer.resblocks:
-            new_visual_model.append(AdapterResidualAttentionBlock_2(block))
+            new_visual_model.append(AdapterResidualAttentionBlock(block))
         new_visual_model = nn.Sequential(*new_visual_model)
         self.origin_model.visual.transformer.resblocks = new_visual_model
         # Embedding method
@@ -98,7 +65,8 @@ class Adapter_CLIP(nn.Module):
             param.requires_grad = False
 
     def encode_image(self, image):
-        return self.origin_model.visual(image.type(self.origin_model.dtype))
+        image_feature = self.origin_model.visual(image.type(self.origin_model.dtype))
+        return image_feature
 
     def encode_text(self, text):
         if self.embed == embedMethod.clip:
