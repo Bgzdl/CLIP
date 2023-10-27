@@ -44,8 +44,8 @@ class LoRA(nn.Module, LoRALayer):
         self.out_features = out_features
         self.scaling = self.lora_alpha / self.r
         self.lora_A = nn.Parameter(torch.zeros(r, in_features))
-        self.lora_B = nn.Parameter(torch.zeros(out_features, r))
         nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
+        self.lora_B = nn.Parameter(torch.zeros(out_features, r))
         nn.init.zeros_(self.lora_B)
 
     def forward(self, x):

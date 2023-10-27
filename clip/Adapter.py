@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import clip
 from .embedMethod import embedMethod
+import math
 from .model import CLIP, ResidualAttentionBlock, LayerNorm
 from biobert.biobert import bert_token_embedding
 
@@ -11,8 +12,10 @@ class FeedforwardAdapter(nn.Module):
     def __init__(self, input_dim, hidden_dim=16):
         super(FeedforwardAdapter, self).__init__()
 
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, input_dim)
+        self.fc1 = nn.Linear(input_dim, hidden_dim, bias=False)
+        nn.init.kaiming_uniform_(self.fc1.weight, a=math.sqrt(5))
+        self.fc2 = nn.Linear(hidden_dim, input_dim, bias=False)
+        nn.init.zeros_(self.fc2.weight)
 
     def forward(self, x):
         # First linear transformation
