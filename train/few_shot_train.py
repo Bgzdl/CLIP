@@ -22,6 +22,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # 模型超参数
 args = parser.parse_args()
+Optimization = args.model
 epoches = args.epoches
 batch_size = args.batch_size
 temperature = args.temperature
@@ -39,7 +40,6 @@ best_epoch = 0
 model_name = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
 _, transform = clip.load(model_name)
 print(model_name)
-Optimization = 'LoRA'  # model_name = ['Adapter', 'LoRA']
 embed = embedMethod.clip
 if Optimization == 'Adapter':
     model = Adapter_CLIP(embed, model_name)

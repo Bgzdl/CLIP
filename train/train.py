@@ -12,6 +12,7 @@ sys.path.append(parent_directory)
 import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
+from clip.Prompt_LoRA import VPT_LoRA_CLIP
 from function import train, evaluate, save_model
 from dataset.dataset import Patch
 from loss.InfoNCE import InfoNCE_loss
@@ -22,6 +23,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # 模型超参数
 args = parser.parse_args()
+Optimization = args.model
 epoches = args.epoches
 batch_size = args.batch_size
 temperature = args.temperature
@@ -36,17 +38,21 @@ best_epoch = 0
 model_name = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
 _, transform = clip.load(model_name)
 print(model_name)
-Optimization = 'Adapter'  # model_name = ['Adapter', 'LoRA']
 embed = embedMethod.clip
 if Optimization == 'Adapter':
     model = Adapter_CLIP(embed, model_name)
 elif Optimization == 'LoRA':
     model = LoRA_CLIP(embed, model_name)
+elif Optimization == 'Prompt_LoRA':
+    model = VPT_LoRA_CLIP(embed, model_name, 10)
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
 model.to(device)
-
+'''
+for name, param in model.named_parameters():
+    print(name, param.requires_grad)
+'''
 if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model)
 

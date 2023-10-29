@@ -6,7 +6,7 @@ import math
 from biobert.biobert import bert_token_embedding
 
 
-class LoRALayer():
+class LoRALayer:
     def __init__(
             self,
             r: int,
@@ -133,7 +133,7 @@ class Simple_LoRA_CLIP(nn.Module):
         self.origin_model, _ = clip.load(model_name)
         for param in self.origin_model.parameters():
             param.requires_grad = False
-        self.Lora = LoRA(224*224*3, 768, 8)
+        self.Lora = LoRA(224 * 224 * 3, 768, 8)
         self.embed = embed
         self.Biobert = bert_token_embedding(self.name)
         for param in self.Biobert.parameters():
