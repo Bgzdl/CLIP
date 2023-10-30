@@ -4,6 +4,10 @@ __pycache__/
 *.egg-info
 .pytest_cache
 .ipynb_checkpoints
+log/*
+data/*
+biobert-base-cased-v1.2/
+model/*
 
 thumbs.db
 .DS_Store

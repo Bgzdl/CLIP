@@ -44,7 +44,7 @@ if Optimization == 'Adapter':
 elif Optimization == 'LoRA':
     model = LoRA_CLIP(embed, model_name)
 elif Optimization == 'Prompt_LoRA':
-    model = VPT_LoRA_CLIP(embed, model_name, 10)
+    model = VPT_LoRA_CLIP(embed, model_name, batch_size/4)
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
@@ -76,6 +76,7 @@ scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=de
 
 # 日志文件
 save_path = "./log/all"
+save_path = os.path.join(save_path, Optimization)
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
