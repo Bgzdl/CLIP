@@ -23,6 +23,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # 模型超参数
 args = parser.parse_args()
 Optimization = args.model
+path = args.data_path
 epoches = args.epoches
 batch_size = args.batch_size
 temperature = args.temperature
@@ -58,8 +59,8 @@ infonce_loss = InfoNCE_loss(temperature).cuda()
 
 # 数据集
 print('preparing dataset')
-train_dataset = Few_shot_train('/root/autodl-tmp/patch', transform, load=True, shot_num=shot_num)
-val_dataset = Few_shot_val('/root/autodl-tmp/patch', transform, load=False, shot_num=shot_num)
+train_dataset = Few_shot_train(path, transform, load=True, shot_num=shot_num)
+val_dataset = Few_shot_val(path, transform, load=False, shot_num=shot_num)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 print('finish')
