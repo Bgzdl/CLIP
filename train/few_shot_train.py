@@ -12,8 +12,9 @@ sys.path.append(parent_directory)
 import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
+from clip.Prompt_LoRA import VPT_LoRA_CLIP
 from loss.InfoNCE import InfoNCE_loss
-from dataset.few_shot_dataset import Few_shot_train, Few_shot_val
+from dataset.dataset import Patch
 from function import train, evaluate, save_model
 from parse.few_shot_parser import parser
 
@@ -46,6 +47,8 @@ if Optimization == 'Adapter':
     model = Adapter_CLIP(embed, model_name)
 elif Optimization == 'LoRA':
     model = LoRA_CLIP(embed, model_name)
+elif Optimization == 'Prompt_LoRA':
+    model = VPT_LoRA_CLIP(embed, model_name, 1)
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
@@ -59,8 +62,8 @@ infonce_loss = InfoNCE_loss(temperature).cuda()
 
 # 数据集
 print('preparing dataset')
-train_dataset = Few_shot_train(path, transform, load=True, shot_num=shot_num)
-val_dataset = Few_shot_val(path, transform, load=False, shot_num=shot_num)
+train_dataset = Patch(path, 'train', transform, load=False, shot_num=shot_num)
+val_dataset = Patch(path, 'val', transform, load=False)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 print('finish')

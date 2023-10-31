@@ -45,7 +45,7 @@ if Optimization == 'Adapter':
 elif Optimization == 'LoRA':
     model = LoRA_CLIP(embed, model_name)
 elif Optimization == 'Prompt_LoRA':
-    model = VPT_LoRA_CLIP(embed, model_name, batch_size/4)
+    model = VPT_LoRA_CLIP(embed, model_name, 1)
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
@@ -62,10 +62,8 @@ infonce_loss = InfoNCE_loss(temperature).cuda()
 
 # 数据集
 print('preparing dataset')
-dataset = Patch(path, True, transform, load=False)
-count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
-print('Quantity of various categories is', count_0, count_1, count_2)
-train_dataset, val_dataset, test_dataset = dataset.split()
+train_dataset = Patch(path, 'train', transform, load=False)
+val_dataset = Patch(path, 'val', transform, load=False)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 print('finish')
