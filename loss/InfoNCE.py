@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -9,7 +10,7 @@ class CrossEntropyLoss(nn.Module):
 
     def forward(self, similarity, labels):
         criterion = nn.CrossEntropyLoss()
-        similarity = similarity * torch.exp(self.t)
+        similarity = similarity * np.exp(self.t)
         similarity = similarity + 1e-6
         loss = criterion(similarity.T, labels)
         return loss
@@ -22,7 +23,7 @@ class InfoNCE_Loss(nn.Module):
         self.t = t
 
     def forward(self, logits_per_image):
-        logits_per_image = logits_per_image * torch.exp(self.t)
+        logits_per_image = logits_per_image * np.exp(self.t)
         labels = torch.arange(logits_per_image.shape[0]).to(logits_per_image.device)
         loss_i = self.criterion(logits_per_image, labels)
         return loss_i

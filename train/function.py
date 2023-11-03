@@ -10,21 +10,16 @@ from biobert.biobert import bert
 # train
 def train(model, dataloader, criterion, optimizer, embed, epoch, train_logger):
     running_loss = 0.0
-    T = ['Well differentiated tubular adenocarcinoma',
-         'Moderately differentiated tubular adenocarcinoma',
-         'Poorly differentiated adenocarcinoma']
-    if embed == embedMethod.clip:
-        T = clip.tokenize([desc for desc in T]).cuda()
-    elif embed == embedMethod.bio_bert:
-        T = bert.tokenize([desc for desc in T]).cuda()
-    else:
-        raise Exception("Val Token Error")
-    text_features = model.encode_text(T).float()
-    text_features /= text_features.norm(dim=-1, keepdim=True)
     for i, dictionary in enumerate(tqdm(dataloader, desc=f"Epoch {epoch + 1}/{30}")):
         optimizer.zero_grad()
         I, T = dictionary['data'], dictionary['target']
         I = torch.tensor(np.stack(I)).cuda()
+        if embed == embedMethod.clip:
+            T = clip.tokenize([desc for desc in T]).cuda()
+        elif embed == embedMethod.bio_bert:
+            T = bert.tokenize([desc for desc in T]).cuda()
+        else:
+            raise Exception("Val Token Error")
         logits_per_image, _ = model(I, T)
         loss = criterion(logits_per_image)
         loss.backward()
