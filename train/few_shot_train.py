@@ -12,7 +12,7 @@ sys.path.append(parent_directory)
 import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
-from loss.InfoNCE import InfoNCE_loss
+from loss.InfoNCE import CrossEntropyLoss
 from dataset.few_shot_dataset import Few_shot_train, Few_shot_val
 from function import train, evaluate, save_model
 from parse.few_shot_parser import parser
@@ -55,7 +55,7 @@ if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model)
 
 # loss
-infonce_loss = InfoNCE_loss(temperature).cuda()
+infonce_loss = CrossEntropyLoss(temperature).cuda()
 
 # 数据集
 print('preparing dataset')

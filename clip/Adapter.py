@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import clip
 from .embedMethod import embedMethod
 import math
-from .model import CLIP, ResidualAttentionBlock, LayerNorm
+from .LoRA import get_max_indices
 from biobert.biobert import bert_token_embedding
 
 
@@ -105,3 +105,13 @@ class Adapter_CLIP(nn.Module):
 
         # shape = [global_batch_size, global_batch_size]
         return logits_per_image, logits_per_text
+
+    @torch.no_grad()
+    def predict(self, image, text):
+        image_features = self.encode_image(image).float()
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+        text_features = self.encode_text(text).float()
+        text_features /= text_features.norm(dim=-1, keepdim=True)
+        similarity = text_features.cpu().numpy() @ image_features.cpu().numpy().T
+        predict = get_max_indices(similarity.T)
+        return similarity, predict

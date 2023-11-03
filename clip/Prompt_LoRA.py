@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .LoRA import LoRA_CLIP
+from .LoRA import LoRA_CLIP, get_max_indices
 from .embedMethod import embedMethod
 
 
@@ -23,3 +23,13 @@ class VPT_LoRA_CLIP(nn.Module):
 
     def forward(self, image, text):
         return self.pretrained_model(image, text)
+
+    @torch.no_grad()
+    def predict(self, image, text):
+        image_features = self.encode_image(image).float()
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+        text_features = self.encode_text(text).float()
+        text_features /= text_features.norm(dim=-1, keepdim=True)
+        similarity = text_features.cpu().numpy() @ image_features.cpu().numpy().T
+        predict = get_max_indices(similarity.T)
+        return similarity, predict
