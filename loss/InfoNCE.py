@@ -40,6 +40,8 @@ class InfoNCE_Loss(nn.Module):
 
     def forward(self, logits_per_image, labels):
         logits_per_image = logits_per_image * np.exp(self.t)
+        m = nn.LogSoftmax(dim=1)
+        logits_per_image = m(logits_per_image)
         probability = torch.tensor(get_probability_matrix(labels)).to(logits_per_image.device)
         loss_i = self.criterion(logits_per_image, probability)
         return loss_i
