@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class CrossEntropyLoss(nn.Module):
@@ -29,12 +30,27 @@ def get_probability_matrix(labels: np.array):
                     probability[i, j] = 0.3 / n
                 else:
                     probability[i, j] = 0
-    return probability
+    return torch.tensor(probability)
 
 
-class InfoNCE_Loss(nn.Module):
+def get_weight_matrix(labels: np.array):
+    length = len(labels)
+    weight = np.zeros((length, length))
+    for i in range(length):
+        for j in range(length):
+            if i == j:
+                weight[i, j] = 1
+            else:
+                if labels[i] == labels[j]:
+                    pass
+                else:
+                    weight[i, j] = 1
+    return torch.tensor(weight)
+
+
+class Probability_Loss(nn.Module):
     def __init__(self, t):
-        super(InfoNCE_Loss, self).__init__()
+        super(Probability_Loss, self).__init__()
         self.criterion = nn.KLDivLoss(reduction='batchmean')
         self.t = t
 
@@ -42,6 +58,18 @@ class InfoNCE_Loss(nn.Module):
         logits_per_image = logits_per_image * np.exp(self.t)
         m = nn.LogSoftmax(dim=1)
         logits_per_image = m(logits_per_image)
-        probability = torch.tensor(get_probability_matrix(labels)).to(logits_per_image.device)
+        probability = get_probability_matrix(labels).to(logits_per_image.device)
         loss_i = self.criterion(logits_per_image, probability)
+        return loss_i
+
+
+class InfoNCE_Loss(nn.Module):
+    def __init__(self, t):
+        super(InfoNCE_Loss, self).__init__()
+        self.t = t
+
+    def forward(self, logits_per_image, labels):
+        logits_per_image = logits_per_image * np.exp(self.t)
+        weight = get_weight_matrix(labels)
+        loss_i = F.cross_entropy(logits_per_image, labels, weight=weight)
         return loss_i
