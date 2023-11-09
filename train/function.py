@@ -12,7 +12,7 @@ def train(model, dataloader, criterion, optimizer, embed, epoch, train_logger):
     running_loss = 0.0
     for i, dictionary in enumerate(tqdm(dataloader, desc=f"Epoch {epoch + 1}/{30}")):
         optimizer.zero_grad()
-        I, T = dictionary['data'], dictionary['target']
+        I, T, label = dictionary['data'], dictionary['target'], dictionary['label']
         I = torch.tensor(np.stack(I)).cuda()
         if embed == embedMethod.clip:
             T = clip.tokenize([desc for desc in T]).cuda()
@@ -21,7 +21,7 @@ def train(model, dataloader, criterion, optimizer, embed, epoch, train_logger):
         else:
             raise Exception("Val Token Error")
         logits_per_image, _ = model(I, T)
-        loss = criterion(logits_per_image)
+        loss = criterion(logits_per_image, label)
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
