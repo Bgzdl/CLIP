@@ -34,17 +34,17 @@ def get_probability_matrix(labels: np.array):
 
 def get_mask(labels: np.array):
     length = len(labels)
-    mask = np.zeros((length, length))
+    mask = np.zeros((length, length), dtype=bool)
     for i in range(length):
         for j in range(length):
             if i == j:
-                mask[i, j] = 1
+                mask[i, j] = 0
             else:
                 if labels[i] == labels[j]:
                     pass
                 else:
                     mask[i, j] = 1
-    return torch.tensor(mask)
+    return torch.from_numpy(mask)
 
 
 class Probability_Loss(nn.Module):
@@ -69,18 +69,12 @@ class maskedInfoNCE_Loss(nn.Module):
         self.t = t
 
     def forward(self, logits_per_image, labels):
-        logits_per_image = logits_per_image * np.exp(self.t)
-        logits_per_image = self.softmax(logits_per_image)
+        logits_per_image = torch.softmax(logits_per_image, dim=1)
         mask = get_mask(labels).to(logits_per_image.device)
-        N = mask.shape[0]
-        for i in range(N):
-            for j in range(N):
-                if i == j:
-                    if i == 0:
-                        loss = torch.log(logits_per_image[i, j])
-                    else:
-                        loss += torch.log(logits_per_image[i, j])
-                else:
-                    loss += mask[i, j] * torch.log(1 - logits_per_image[i, j])
+        diagonal_loss = torch.log(logits_per_image.diagonal())
+        masked_logits = logits_per_image.masked_fill(~mask, 0)
+        non_diagonal_loss = torch.log(1 - masked_logits)
+        loss = -diagonal_loss.sum() - (mask * non_diagonal_loss).sum()
+        N = logits_per_image.size(0)
         loss = loss / N
         return loss
