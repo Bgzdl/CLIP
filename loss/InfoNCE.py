@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class CrossEntropyLoss(nn.Module):
@@ -33,19 +32,19 @@ def get_probability_matrix(labels: np.array):
     return torch.tensor(probability)
 
 
-def get_weight_matrix(labels: np.array):
+def get_mask(labels: np.array):
     length = len(labels)
-    weight = np.zeros((length, length))
+    mask = np.zeros((length, length))
     for i in range(length):
         for j in range(length):
             if i == j:
-                weight[i, j] = 1
+                mask[i, j] = 1
             else:
                 if labels[i] == labels[j]:
                     pass
                 else:
-                    weight[i, j] = 1
-    return torch.tensor(weight)
+                    mask[i, j] = 1
+    return torch.tensor(mask)
 
 
 class Probability_Loss(nn.Module):
@@ -63,13 +62,25 @@ class Probability_Loss(nn.Module):
         return loss_i
 
 
-class InfoNCE_Loss(nn.Module):
+class maskedInfoNCE_Loss(nn.Module):
     def __init__(self, t):
-        super(InfoNCE_Loss, self).__init__()
+        super(maskedInfoNCE_Loss, self).__init__()
+        self.softmax = nn.Softmax(dim=1)
         self.t = t
 
     def forward(self, logits_per_image, labels):
         logits_per_image = logits_per_image * np.exp(self.t)
-        weight = get_weight_matrix(labels)
-        loss_i = F.cross_entropy(logits_per_image, labels, weight=weight)
-        return loss_i
+        logits_per_image = self.softmax(logits_per_image)
+        mask = get_mask(labels).to(logits_per_image.device)
+        N = mask.shape[0]
+        for i in range(N):
+            for j in range(N):
+                if i == j:
+                    if i == 0:
+                        loss = torch.log(logits_per_image[i, j])
+                    else:
+                        loss += torch.log(logits_per_image[i, j])
+                else:
+                    loss += mask[i, j] * torch.log(1 - logits_per_image[i, j])
+        loss = loss / N
+        return loss
