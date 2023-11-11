@@ -15,7 +15,7 @@ from clip.Adapter import Adapter_CLIP
 from clip.Prompt_LoRA import VPT_LoRA_CLIP
 from function import train, evaluate, save_model
 from dataset.dataset import Patch
-from loss.InfoNCE import CrossEntropyLoss, maskedInfoNCE_Loss
+from loss.InfoNCE import CrossEntropyLoss, maskedInfoNCE_Loss, Probability_Loss
 from parse.parser import parser
 
 # 设备准备
@@ -60,6 +60,7 @@ if torch.cuda.device_count() > 1:
 # loss
 CrossEntropyLoss = CrossEntropyLoss(temperature).cuda()
 infoNCE_loss = maskedInfoNCE_Loss(temperature).cuda()
+probabilityLoss = Probability_Loss(temperature).cuda()
 
 # 数据集
 print('preparing dataset')
@@ -99,14 +100,15 @@ running_logger.addHandler(logging.FileHandler(running_path, mode='w'))  # 将日
 # 训练过程
 for epoch in range(epoches):
     torch.cuda.empty_cache()
+    loss_function = probabilityLoss
     with torch.autocast("cuda"):
         model.train()
-        train_loss = train(model, train_dataloader, infoNCE_loss, optimizer, model.embed, epoch, train_logger)
+        train_loss = train(model, train_dataloader, loss_function, optimizer, model.embed, epoch, train_logger)
         print(f"Train Epoch {epoch + 1}/{30}, Average Loss: {train_loss:.4f}")
         scheduler.step()
         model.eval()
         with torch.no_grad():
-            acc = evaluate(model, val_dataloader, CrossEntropyLoss, model.embed, epoch, predict_logger)
+            acc = evaluate(model, val_dataloader, loss_function, model.embed, epoch, predict_logger)
             print(f"Validation Epoch {epoch + 1}/{30}, Accuracy: {acc:.8f}")
         running_logger.info(f"Epoch: {epoch + 1}, Running Loss: {train_loss:.8f}, acc: {acc:.8f}")
 
