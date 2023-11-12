@@ -45,7 +45,7 @@ if Optimization == 'Adapter':
 elif Optimization == 'LoRA':
     model = LoRA_CLIP(embed, model_name)
 elif Optimization == 'Prompt_LoRA':
-    model = VPT_LoRA_CLIP(embed, model_name, batch_size/4)
+    model = VPT_LoRA_CLIP(embed, model_name, 1)
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
