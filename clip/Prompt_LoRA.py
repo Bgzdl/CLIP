@@ -30,7 +30,7 @@ class VPT_LoRA_CLIP(nn.Module):
         text_features = text_features / text_features.norm(dim=1, keepdim=True)
 
         # cosine similarity as logits
-        logit_scale = self.origin_model.logit_scale.exp()
+        logit_scale = self.pretrained_model.origin_model.logit_scale.exp()
         logits_per_image = logit_scale * image_features @ text_features.t()
         logits_per_text = logits_per_image.t()
 
