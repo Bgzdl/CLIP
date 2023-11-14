@@ -1,29 +1,29 @@
 import os
-from torch.utils.data import Dataset
 import pandas as pd
+from torch.utils.data import Dataset
 from PIL import Image
 
-label_dict = {'Well differentiated tubular adenocarcinoma': 0,
-              'Moderately differentiated tubular adenocarcinoma': 1,
-              'Poorly differentiated adenocarcinoma, non-solid type': 2,
-              'Poorly differentiated adenocarcinoma, solid type': 2}
+label_dict = ['Well differentiated tubular adenocarcinoma',
+              'Moderately differentiated tubular adenocarcinoma',
+              'Poorly differentiated adenocarcinoma']
 
 
-class Few_shot_train(Dataset):
-    def __init__(self, path, transform=None, load=False, shot_num: int = 1):
-        self.data_information = pd.read_csv(os.path.join(path, 'captions.csv'))
-        self.shot_num = shot_num
+class Few_shot_Dataset(Dataset):
+    def __init__(self, path, dataset_type, transform=None, load=False, shot_num=0):
+        self.length = 0
         self.data = []
         self.target = []
         self.label = []
         self.path = path
+        self.dataset_type = dataset_type
+        self.shot_num = shot_num
         self.transform = transform
+        self.data_information = self.get_data_split_path()
         self.load = load
-        self.groups = self.Count_number_of_statistical_group()
         if self.load:
-            self.preprocess(self.groups)
+            self.preprocess()
         else:
-            self.load_img_path(self.groups)
+            self.load_img_path()
 
     def load_img(self, img_path):
         image = Image.open(img_path).convert("RGB")
@@ -31,74 +31,52 @@ class Few_shot_train(Dataset):
             image = self.transform(image)
         return image
 
-    def load_img_path(self, groups):
-        group_0, group_1, group_2 = groups
-        for group_name in group_0:
-            text = 'Well differentiated tubular adenocarcinoma'
-            imgs_path = os.path.join(self.path, 'new_dataset', group_name)
-            for root, dirs, files in os.walk(imgs_path):
-                for file in files:
-                    img_path = os.path.join(root, file)
-                    self.data.append(img_path)
-                    self.label.append(0)
-                    self.target.append(text)
-        for group_name in group_1:
-            text = 'Moderately differentiated tubular adenocarcinoma'
-            imgs_path = os.path.join(self.path, 'new_dataset', group_name)
-            for root, dirs, files in os.walk(imgs_path):
-                for file in files:
-                    img_path = os.path.join(root, file)
-                    self.data.append(img_path)
-                    self.label.append(1)
-                    self.target.append(text)
-        for group_name in group_2:
-            text = 'Poorly differentiated adenocarcinoma'
-            imgs_path = os.path.join(self.path, 'new_dataset', group_name)
-            for root, dirs, files in os.walk(imgs_path):
-                for file in files:
-                    img_path = os.path.join(root, file)
-                    self.data.append(img_path)
-                    self.label.append(2)
-                    self.target.append(text)
+    def get_data_split_path(self):
+        if self.dataset_type == 'train':
+            if self.shot_num == 0:
+                information_path = os.path.join(self.path, 'split', 'train_all_0.2.csv')
+            elif self.shot_num == 1:
+                information_path = os.path.join(self.path, 'split', 'train_1_0.2.csv')
+            elif self.shot_num == 2:
+                information_path = os.path.join(self.path, 'split', 'train_2_0.2.csv')
+            elif self.shot_num == 4:
+                information_path = os.path.join(self.path, 'split', 'train_4_0.2.csv')
+            elif self.shot_num == 8:
+                information_path = os.path.join(self.path, 'split', 'train_8_0.2.csv')
+            elif self.shot_num == 16:
+                information_path = os.path.join(self.path, 'split', 'train_4_0.2.csv')
+            else:
+                raise Exception("Shot number should be 1, 2, 4, 8, 16")
+        elif self.dataset_type == 'val':
+            information_path = os.path.join(self.path, 'split', 'val_0.8.csv')
+        else:
+            raise Exception("Type should be train or val")
+        return pd.read_csv(information_path)
 
-    def preprocess(self, groups):
-        group_0, group_1, group_2 = groups
-        for group_name in group_0:
-            text = 'Well differentiated tubular adenocarcinoma'
-            imgs_path = os.path.join(self.path, 'new_dataset', group_name)
-            for root, dirs, files in os.walk(imgs_path):
-                for file in files:
-                    img_path = os.path.join(root, file)
-                    image = Image.open(img_path).convert("RGB")
-                    if self.transform is not None:
-                        image = self.transform(image)
-                    self.data.append(image)
-                    self.label.append(0)
-                    self.target.append(text)
-        for group_name in group_1:
-            text = 'Moderately differentiated tubular adenocarcinoma'
-            imgs_path = os.path.join(self.path, 'new_dataset', group_name)
-            for root, dirs, files in os.walk(imgs_path):
-                for file in files:
-                    img_path = os.path.join(root, file)
-                    image = Image.open(img_path).convert("RGB")
-                    if self.transform is not None:
-                        image = self.transform(image)
-                    self.data.append(image)
-                    self.label.append(1)
-                    self.target.append(text)
-        for group_name in group_2:
-            text = 'Poorly differentiated adenocarcinoma'
-            imgs_path = os.path.join(self.path, 'new_dataset', group_name)
-            for root, dirs, files in os.walk(imgs_path):
-                for file in files:
-                    img_path = os.path.join(root, file)
-                    image = Image.open(img_path).convert("RGB")
-                    if self.transform is not None:
-                        image = self.transform(image)
-                    self.data.append(image)
-                    self.label.append(2)
-                    self.target.append(text)
+    def load_img_path(self):
+        for _, row in self.data_information.iterrows():
+            image_path = row[0]
+            group_name, _ = image_path.split('_')
+            image_path = os.path.join(self.path, 'new_dataset', group_name, image_path)
+            label = int(row[1])
+            target = row[2]
+            self.data.append(image_path)
+            self.label.append(label)
+            self.target.append(target)
+
+    def preprocess(self):
+        for _, row in self.data_information.iterrows():
+            image_path = row[0]
+            group_name, _ = image_path.split('_')
+            image_path = os.path.join(self.path, 'new_dataset', group_name, image_path)
+            image = Image.open(image_path).convert("RGB")
+            if self.transform is not None:
+                image = self.transform(image)
+            label = int(row[1])
+            target = row[2]
+            self.data.append(image)
+            self.label.append(label)
+            self.target.append(target)
 
     def __getitem__(self, idx):
         if self.load:
@@ -114,131 +92,3 @@ class Few_shot_train(Dataset):
         count_1 = self.label.count(1)
         count_2 = self.label.count(2)
         return [count_0, count_1, count_2]
-
-    def Count_number_of_statistical_group(self):
-        def get_keys_with_max_n_chars(dictionary, n):
-            result = []
-            for key, value in dictionary.items():
-                result.append((key, value))
-            result.sort(key=lambda x: x[1], reverse=True)
-            return [key for key, value in result[:n]]
-
-        group_0_dict = dict()
-        group_1_dict = dict()
-        group_2_dict = dict()
-        for i, [_, d] in enumerate(self.data_information.iterrows()):
-            text = d['subtype']
-            if text in label_dict.keys():
-                imgs_path = os.path.join(self.path, 'new_dataset', d['id'])
-                file_count = len(
-                    [name for name in os.listdir(imgs_path) if os.path.isfile(os.path.join(imgs_path, name))])
-                if label_dict[d['subtype']] == 0:
-                    group_0_dict[d['id']] = file_count
-                elif label_dict[d['subtype']] == 1:
-                    group_1_dict[d['id']] = file_count
-                else:
-                    group_2_dict[d['id']] = file_count
-
-        group_0 = get_keys_with_max_n_chars(group_0_dict, self.shot_num)
-        group_1 = get_keys_with_max_n_chars(group_1_dict, self.shot_num)
-        group_2 = get_keys_with_max_n_chars(group_2_dict, self.shot_num)
-        return group_0, group_1, group_2
-
-
-class Few_shot_val(Dataset):
-    def __init__(self, path, transform=None, load=False, shot_num: int = 1):
-        self.data_information = pd.read_csv(os.path.join(path, 'captions.csv'))
-        self.shot_num = shot_num
-        self.data = []
-        self.target = []
-        self.label = []
-        self.path = path
-        self.transform = transform
-        self.load = load
-        groups = self.Count_number_of_statistical_group()
-        groups = groups[0] + groups[1] + groups[2]
-        if self.load:
-            self.preprocess(groups)
-        else:
-            self.load_img_path(groups)
-
-    def load_img(self, img_path):
-        image = Image.open(img_path).convert("RGB")
-        if self.transform is not None:
-            image = self.transform(image)
-        return image
-
-    def Count_number_of_statistical_group(self):
-        def get_keys_with_max_n_chars(dictionary, n):
-            result = []
-            for key, value in dictionary.items():
-                result.append((key, value))
-            result.sort(key=lambda x: x[1], reverse=True)
-            return [key for key, value in result[:n]]
-
-        group_0_dict = dict()
-        group_1_dict = dict()
-        group_2_dict = dict()
-        for i, [_, d] in enumerate(self.data_information.iterrows()):
-            text = d['subtype']
-            if text in label_dict.keys():
-                imgs_path = os.path.join(self.path, 'new_dataset', d['id'])
-                file_count = len(
-                    [name for name in os.listdir(imgs_path) if os.path.isfile(os.path.join(imgs_path, name))])
-                if label_dict[d['subtype']] == 0:
-                    group_0_dict[d['id']] = file_count
-                elif label_dict[d['subtype']] == 1:
-                    group_1_dict[d['id']] = file_count
-                else:
-                    group_2_dict[d['id']] = file_count
-
-        group_0 = get_keys_with_max_n_chars(group_0_dict, self.shot_num)
-        group_1 = get_keys_with_max_n_chars(group_1_dict, self.shot_num)
-        group_2 = get_keys_with_max_n_chars(group_2_dict, self.shot_num)
-        return group_0, group_1, group_2
-
-    def load_img_path(self, groups):
-        # 读取图片路径并存在list里
-        for i, [_, d] in enumerate(self.data_information.iterrows()):
-            text = d['subtype']
-            if text in label_dict.keys():
-                if ',' in text:
-                    text = text.split(',')[0]
-                if d['id'] in groups:
-                    continue
-                imgs_path = os.path.join(self.path, 'new_dataset', d['id'])
-                for root, dirs, files in os.walk(imgs_path):
-                    for file in files:
-                        img_path = os.path.join(root, file)
-                        self.data.append(img_path)
-                        self.label.append(label_dict[d['subtype']])
-                        self.target.append(text)
-
-    def preprocess(self, groups):
-        # 读取数据并存在list里
-        for i, [_, d] in enumerate(self.data_information.iterrows()):
-            text = d['subtype']
-            if text in label_dict.keys():
-                if ',' in text:
-                    text = text.split(',')[0]
-                if d['id'] in groups:
-                    continue
-                imgs_path = os.path.join(self.path, 'new_dataset', d['id'])
-                for root, dirs, files in os.walk(imgs_path):
-                    for file in files:
-                        img_path = os.path.join(root, file)
-                        image = Image.open(img_path).convert("RGB")
-                        if self.transform is not None:
-                            image = self.transform(image)
-                        self.data.append(image)
-                        self.label.append(label_dict[d['subtype']])
-                        self.target.append(text)
-
-    def __getitem__(self, idx):
-        if self.load:
-            return {'data': self.data[idx], 'target': self.target[idx], 'label': self.label[idx]}
-        else:
-            return {'data': self.load_img(self.data[idx]), 'target': self.target[idx], 'label': self.label[idx]}
-
-    def __len__(self):
-        return len(self.data)

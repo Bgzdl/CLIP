@@ -12,8 +12,9 @@ sys.path.append(parent_directory)
 import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
-from loss.InfoNCE import CrossEntropyLoss
-from dataset.few_shot_dataset import Few_shot_train, Few_shot_val
+from clip.Prompt_LoRA import VPT_LoRA_CLIP
+from loss.InfoNCE import CrossEntropyLoss, maskedInfoNCE_Loss, Probability_Loss
+from dataset.few_shot_dataset import Few_shot_Dataset
 from function import train, evaluate, save_model
 from parse.few_shot_parser import parser
 
@@ -46,6 +47,8 @@ if Optimization == 'Adapter':
     model = Adapter_CLIP(embed, model_name)
 elif Optimization == 'LoRA':
     model = LoRA_CLIP(embed, model_name)
+elif Optimization == 'Prompt_LoRA':
+    model = VPT_LoRA_CLIP(embed, model_name, 1)
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
@@ -55,12 +58,14 @@ if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model)
 
 # loss
-infonce_loss = CrossEntropyLoss(temperature).cuda()
+CrossEntropyLoss = CrossEntropyLoss(temperature).cuda()
+infoNCE_loss = maskedInfoNCE_Loss(temperature).cuda()
+probabilityLoss = Probability_Loss(temperature).cuda()
 
 # 数据集
 print('preparing dataset')
-train_dataset = Few_shot_train(path, transform, load=True, shot_num=shot_num)
-val_dataset = Few_shot_val(path, transform, load=False, shot_num=shot_num)
+train_dataset = Few_shot_Dataset(path, 'train', transform, load=False, shot_num=shot_num)
+val_dataset = Few_shot_Dataset(path, 'val', transform, load=False)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 print('finish')
@@ -92,14 +97,15 @@ running_logger.addHandler(logging.FileHandler(running_path, mode='w'))  # 将日
 
 for epoch in range(epoches):
     torch.cuda.empty_cache()
+    loss_function = infoNCE_loss
     with torch.autocast("cuda"):
         model.train()
-        train_loss = train(model, train_dataloader, infonce_loss, optimizer, model.embed, epoch, train_logger)
+        train_loss = train(model, train_dataloader, loss_function, optimizer, model.embed, epoch, train_logger)
         print(f"Train Epoch {epoch + 1}/{epoches}, Average Loss: {train_loss:.4f}")
         scheduler.step()
         model.eval()
         with torch.no_grad():
-            acc = evaluate(model, val_dataloader, model.embed, epoch, predict_logger)
+            acc = evaluate(model, val_dataloader, loss_function, model.embed, epoch, predict_logger)
             print(f"Validation Epoch {epoch + 1}/{epoches}, Accuracy: {acc:.8f}")
         running_logger.info(f"Epoch: {epoch + 1}, Running Loss: {train_loss:.8f}, acc: {acc:.8f}")
 
