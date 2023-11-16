@@ -1,4 +1,5 @@
 import os
+import random
 import pandas as pd
 from torch.utils.data import Dataset
 from PIL import Image
@@ -44,7 +45,7 @@ class Few_shot_Dataset(Dataset):
             elif self.shot_num == 8:
                 information_path = os.path.join(self.path, 'split', 'train_8_0.2.csv')
             elif self.shot_num == 16:
-                information_path = os.path.join(self.path, 'split', 'train_4_0.2.csv')
+                information_path = os.path.join(self.path, 'split', 'train_16_0.2.csv')
             else:
                 raise Exception("Shot number should be 1, 2, 4, 8, 16")
         elif self.dataset_type == 'val':
@@ -63,6 +64,11 @@ class Few_shot_Dataset(Dataset):
             self.data.append(image_path)
             self.label.append(label)
             self.target.append(target)
+        indices = list(range(len(self.data)))
+        random.shuffle(indices)
+        self.data = [self.data[i] for i in indices]
+        self.target = [self.target[i] for i in indices]
+        self.label = [self.label[i] for i in indices]
 
     def preprocess(self):
         for _, row in self.data_information.iterrows():
@@ -77,6 +83,11 @@ class Few_shot_Dataset(Dataset):
             self.data.append(image)
             self.label.append(label)
             self.target.append(target)
+        indices = list(range(len(self.data)))
+        random.shuffle(indices)
+        self.data = [self.data[i] for i in indices]
+        self.target = [self.target[i] for i in indices]
+        self.label = [self.label[i] for i in indices]
 
     def __getitem__(self, idx):
         if self.load:

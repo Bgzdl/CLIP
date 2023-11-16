@@ -13,8 +13,8 @@ import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
 from clip.Prompt_LoRA import VPT_LoRA_CLIP
-from function import train, evaluate, save_model
-from dataset.dataset import Patch
+from function import train, evaluate, save_model, evaluate_1
+from dataset.dataset import Patch, Patch_Dataset
 from loss.InfoNCE import CrossEntropyLoss, maskedInfoNCE_Loss, Probability_Loss
 from parse.parser import parser
 
@@ -63,11 +63,17 @@ infoNCE_loss = maskedInfoNCE_Loss(temperature).cuda()
 probabilityLoss = Probability_Loss(temperature).cuda()
 
 # 数据集
+'''
 print('preparing dataset')
 dataset = Patch(path, label_type=False, transform=transform, load=False)
 count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
 print('Quantity of various categories is', count_0, count_1, count_2)
 train_dataset, val_dataset, test_dataset = dataset.split()
+'''
+train_dataset = Patch_Dataset(path, 'train', load=False, transform=transform, seed=0)
+val_dataset = Patch_Dataset(path, 'val', load=False, transform=transform, seed=0)
+group_names, group_labels = val_dataset.get_ground_true()
+
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 print('finish')
@@ -108,7 +114,7 @@ for epoch in range(epoches):
         scheduler.step()
         model.eval()
         with torch.no_grad():
-            acc = evaluate(model, val_dataloader, loss_function, model.embed, epoch, predict_logger)
+            acc = evaluate_1(model, group_names,group_labels, val_dataloader, embed, epoch,  predict_logger)
             print(f"Validation Epoch {epoch + 1}/{30}, Accuracy: {acc:.8f}")
         running_logger.info(f"Epoch: {epoch + 1}, Running Loss: {train_loss:.8f}, acc: {acc:.8f}")
 
