@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm
 import os
@@ -38,21 +39,7 @@ def train(model, dataloader, criterion, optimizer, embed, epoch, train_logger):
     return running_loss / len(dataloader)
 
 
-# evaluate
-def get_max_indices(matrix):
-    if not isinstance(matrix, np.ndarray):
-        raise ValueError("Input must be a NumPy array")
-
-    max_indices = []  # 存储每一行最大数字的下标
-
-    for row in matrix:
-        max_index = np.argmax(row)  # 获取当前行最大数字的下标
-        max_indices.append(max_index)
-
-    return np.array(max_indices)
-
-
-def evaluate(model, dataloader, embed: embedMethod, epoch, predict_logger):
+def evaluate(model, dataloader, cirterion, embed: embedMethod, epoch, predict_logger):
     correct = 0
     total = 0
     T = ['Well differentiated tubular adenocarcinoma',
@@ -64,16 +51,11 @@ def evaluate(model, dataloader, embed: embedMethod, epoch, predict_logger):
         T = bert.tokenize([desc for desc in T]).cuda()
     else:
         raise Exception("Val Token Error")
-    text_features = model.encode_text(T).float()
-    text_features /= text_features.norm(dim=-1, keepdim=True)
     for i, dictionary in enumerate(tqdm(dataloader)):
         I = dictionary['data']
         I = torch.tensor(np.stack(I)).cuda()
         label = dictionary['label']
-        image_features = model.encode_image(I).float()
-        image_features /= image_features.norm(dim=-1, keepdim=True)
-        similarity = text_features.cpu().numpy() @ image_features.cpu().numpy().T
-        predict = get_max_indices(similarity.T)
+        similarity, predict = model.predict(I, T)
         total += len(predict)
         predict, label = np.array(predict), np.array(label)
         predict_logger.info(f"Epoch: {epoch + 1}, batch: {i + 1},  Predict: {predict}")
@@ -81,6 +63,45 @@ def evaluate(model, dataloader, embed: embedMethod, epoch, predict_logger):
         correct += np.sum(comparision)
 
     return correct / total
+
+
+def predict(model, dataloader, embed: embedMethod, epoch, predict_logger):
+    result = dict()
+    T = ['Well differentiated tubular adenocarcinoma',
+         'Moderately differentiated tubular adenocarcinoma',
+         'Poorly differentiated adenocarcinoma']
+    if embed == embedMethod.clip:
+        T = clip.tokenize([desc for desc in T]).cuda()
+    elif embed == embedMethod.bio_bert:
+        T = bert.tokenize([desc for desc in T]).cuda()
+    else:
+        raise Exception("Val Token Error")
+    for i, dictionary in enumerate(tqdm(dataloader)):
+        I = dictionary['data']
+        group_names = dictionary['group_name']
+        I = torch.tensor(np.stack(I)).cuda()
+        similarity, max_index = model.predict(I, T)
+        similarity = torch.tensor(similarity)
+        predict_logger.info(f"Epoch: {epoch + 1}, batch: {i + 1},  Predict: {max_index}")
+        for j, row in enumerate(similarity.T):
+            normalized_row = F.softmax(row, dim=0)
+            if group_names[j] in result.keys():
+                result[group_names[j]] += normalized_row
+            else:
+                result[group_names[j]] = normalized_row
+    for key, value in result.items():
+        _, index = value.max(0)
+        result[key] = index
+    return result
+
+
+def evaluate_1(model, group_names, group_labels, dataloader, embed: embedMethod, epoch, predict_loger):
+    result = predict(model, dataloader, embed, epoch, predict_loger)
+    correct = 0
+    for group_name, group_label in zip(group_names, group_labels):
+        correct += result[group_name] == group_label
+    acc = correct / len(group_labels)
+    return acc
 
 
 # save model

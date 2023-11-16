@@ -126,3 +126,100 @@ class Patch(Dataset):
         count_1 = self.label.count(1)
         count_2 = self.label.count(2)
         return [count_0, count_1, count_2]
+
+
+class Patch_Dataset(Dataset):
+    def __init__(self, path, mode='train', load=False, transform=None, seed=0):
+        self.path = path
+        self.load = load
+        self.mode = mode
+        self.seed = seed
+        self.transform = transform
+        group_names, group_labels, group_targets = self.get_split()
+        self.data, self.group_names, self.labels, self.targets, self.num_of_groups = self.load_data(group_names, group_labels, group_targets)
+        indices = list(range(len(self.data)))
+        random.shuffle(indices)
+        self.data = [self.data[i] for i in indices]
+        self.group_names = [self.group_names[i] for i in indices]
+        self.targets = [self.targets[i] for i in indices]
+        self.labels = [self.labels[i] for i in indices]
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        if self.load:
+            return {'data': self.data[idx], 'target': self.targets[idx],
+                    'label': self.labels[idx], 'group_name': self.group_names[idx]}
+        else:
+            return {'data': self.load_img(self.data[idx]), 'target': self.targets[idx],
+                    'label': self.labels[idx], 'group_name': self.group_names[idx]}
+
+    def load_img(self, img_path):
+        image = Image.open(img_path).convert("RGB")
+        if self.transform is not None:
+            image = self.transform(image)
+        return image
+
+    def get_split(self):
+        random.seed(self.seed)
+        group_names = []
+        group_labels = []
+        group_targets = []
+        data_information = pd.read_csv(os.path.join(self.path, 'captions.csv'))
+        for _, row in data_information.iterrows():
+            text = row['subtype']
+            if text in label_dict.keys():
+                if ',' in text:
+                    text = text.split(',')[0]
+                group_names.append(row['id'])
+                group_labels.append(label_dict[row['subtype']])
+                group_targets.append(row['text'])
+        indices = list(range(len(group_names)))
+        random.shuffle(indices)
+        group_names = [group_names[i] for i in indices]
+        group_labels = [group_labels[i] for i in indices]
+        group_targets = [group_targets[i] for i in indices]
+        if self.mode == 'train':
+            return group_names[:int(len(group_names) * 0.2)], group_labels[:int(len(group_names) * 0.2)], \
+                   group_targets[:int(len(group_names) * 0.2)]
+        elif self.mode == 'val':
+            return group_names[int(len(group_names) * 0.2):], group_labels[int(len(group_names) * 0.2):], \
+                   group_targets[int(len(group_names) * 0.2):]
+        else:
+            raise Exception('mode must be train or val')
+
+    def load_data(self, group_names, group_labels, group_targets):
+        data = []
+        data_group_name = []
+        num_of_group = dict()
+        labels = []
+        targets = []
+        for group_name, group_label, group_target in zip(group_names, group_labels, group_targets):
+            imgs_path = os.path.join(self.path, 'new_dataset', group_name)
+            for img_name in os.listdir(imgs_path):
+                img_path = os.path.join(imgs_path, img_name)
+                if os.path.isfile(img_path):
+                    if self.load:
+                        image = self.load_img(img_path)
+                        data.append(image)
+                    else:
+                        data.append(img_path)
+                    data_group_name.append(group_name)
+                    labels.append(group_label)
+                    targets.append(group_target)
+            num_of_group[group_name] = len(os.listdir(imgs_path))
+        return data, data_group_name, labels, targets, num_of_group
+
+    def get_ground_true(self):
+        group_names, group_labels, group_targets = self.get_split()
+        return group_names, group_labels
+
+    def Count_the_number_of_various_tags(self):
+        count_0 = self.labels.count(0)
+        count_1 = self.labels.count(1)
+        count_2 = self.labels.count(2)
+        return [count_0, count_1, count_2]
+
+    def get_num_of_group(self):
+        return self.num_of_groups

@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import clip
@@ -5,6 +6,17 @@ from .embedMethod import embedMethod
 import math
 from biobert.biobert import bert_token_embedding
 
+def get_max_indices(matrix):
+    if not isinstance(matrix, np.ndarray):
+        raise ValueError("Input must be a NumPy array")
+
+    max_indices = []  # 存储每一行最大数字的下标
+
+    for row in matrix:
+        max_index = np.argmax(row)  # 获取当前行最大数字的下标
+        max_indices.append(max_index)
+
+    return np.array(max_indices)
 
 class LoRALayer:
     def __init__(
@@ -116,3 +128,12 @@ class LoRA_CLIP(nn.Module):
         # shape = [global_batch_size, global_batch_size]
         return logits_per_image, logits_per_text
 
+    @torch.no_grad()
+    def predict(self, image, text):
+        image_features = self.encode_image(image).float()
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+        text_features = self.encode_text(text).float()
+        text_features /= text_features.norm(dim=-1, keepdim=True)
+        similarity = text_features.cpu().numpy() @ image_features.cpu().numpy().T
+        predict = get_max_indices(similarity.T)
+        return similarity, predict
