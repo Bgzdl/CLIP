@@ -75,7 +75,7 @@ def predict(model, dataloader, embed: embedMethod, epoch, predict_logger):
         similarity, max_index = model.predict(I, T)
         similarity = torch.tensor(similarity)
         predict_logger.info(f"Epoch: {epoch + 1}, batch: {i + 1},  Predict: {max_index}")
-        for j, row in enumerate(similarity):
+        for j, row in enumerate(similarity.T):
             normalized_row = F.softmax(row, dim=0)
             if group_names[j] in result.keys():
                 result[group_names[j]] += normalized_row
