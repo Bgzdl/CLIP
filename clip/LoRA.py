@@ -94,12 +94,15 @@ class LoRA_CLIP(nn.Module):
         new_model = nn.Sequential(*new_model)
         self.origin_model.visual.transformer.resblocks = new_model
         self.embed = embed
+        self.project = nn.Linear(512, 768)
         self.Biobert = bert_token_embedding(self.name)
         for param in self.Biobert.parameters():
             param.requires_grad = False
 
     def encode_image(self, image):
         image_feature = self.origin_model.visual(image.type(self.origin_model.dtype))
+        if self.name == 'ViT-B/16':
+            image_feature = self.project(image_feature)
         return image_feature
 
     def encode_text(self, text):

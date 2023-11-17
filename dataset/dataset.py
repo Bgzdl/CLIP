@@ -137,7 +137,7 @@ class Patch_Dataset(Dataset):
         self.transform = transform
         group_names, group_labels, group_targets = self.get_split()
         self.data, self.group_names, self.labels, self.targets, self.num_of_groups = self.load_data(group_names, group_labels, group_targets)
-        indices = list(range(len(self.data)))
+        indices = list(range(len(group_names)))
         random.shuffle(indices)
         self.data = [self.data[i] for i in indices]
         self.group_names = [self.group_names[i] for i in indices]
@@ -220,6 +220,9 @@ class Patch_Dataset(Dataset):
         count_1 = self.labels.count(1)
         count_2 = self.labels.count(2)
         return [count_0, count_1, count_2]
+
+    def get_group_length(self):
+        return self.group_length
 
     def get_num_of_group(self):
         return self.num_of_groups
