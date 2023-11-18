@@ -111,6 +111,20 @@ class LoRA_CLIP(nn.Module):
             return x
         elif self.embed == embedMethod.bio_bert:
             x = self.Biobert(text)  # [batch_size, n_ctx, d_model]
+            # 跳过clip的 transformers
+            '''
+            x = x + self.origin_model.positional_embedding.type(self.origin_model.dtype)
+            x = x.permute(1, 0, 2)  # NLD -> LND
+            x = self.origin_model.transformer(x)
+            x = x.permute(1, 0, 2)  # LND -> NLD
+            x = self.origin_model.ln_final(x).type(self.origin_model.dtype)
+
+            # x.shape = [batch_size, n_ctx, transformer.width]
+            # take features from the eot embedding (eot_token is the highest number in each sequence)
+            '''
+            # 减去clip的投影层
+            # x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.origin_model.text_projection
+            x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)]
             return x
         else:
             raise Exception('Embedding Error')

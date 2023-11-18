@@ -136,6 +136,7 @@ class Patch_Dataset(Dataset):
         self.seed = seed
         self.transform = transform
         group_names, group_labels, group_targets = self.get_split()
+        self.group_length = len(group_names)
         self.data, self.group_names, self.labels, self.targets, self.num_of_groups = self.load_data(group_names, group_labels, group_targets)
         indices = list(range(len(group_names)))
         random.shuffle(indices)
