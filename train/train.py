@@ -39,7 +39,7 @@ best_epoch = 0
 model_name = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
 _, transform = clip.load(model_name)
 print(model_name)
-embed = embedMethod.clip
+embed = embedMethod.bio_bert
 if Optimization == 'Adapter':
     model = Adapter_CLIP(embed, model_name)
 elif Optimization == 'LoRA':
