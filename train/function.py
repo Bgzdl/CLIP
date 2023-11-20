@@ -67,6 +67,8 @@ def evaluate(model, dataloader, cirterion, embed: embedMethod, epoch, predict_lo
 
 def predict(model, dataloader, embed: embedMethod, epoch, predict_logger):
     result = dict()
+    correct = 0
+    total = 0
     T = ['Well differentiated tubular adenocarcinoma',
          'Moderately differentiated tubular adenocarcinoma',
          'Poorly differentiated adenocarcinoma']
@@ -77,14 +79,19 @@ def predict(model, dataloader, embed: embedMethod, epoch, predict_logger):
     else:
         raise Exception("Val Token Error")
     for i, dictionary in enumerate(tqdm(dataloader)):
-        I = dictionary['data']
+        I, labels = dictionary['data'], dictionary['label']
         group_names = dictionary['group_name']
         I = torch.tensor(np.stack(I)).cuda()
         similarity, max_index = model.predict(I, T)
         similarity = torch.tensor(similarity)
         predict_logger.info(f"Epoch: {epoch + 1}, batch: {i + 1},  Predict: {max_index}")
+        total += len(max_index)
+        max_index, labels = np.array(max_index), np.array(labels)
+        comparision = max_index == labels
+        correct += np.sum(comparision)
         for j, row in enumerate(similarity.T):
-            normalized_row = F.softmax(row, dim=0)
+            # normalized_row = F.softmax(row, dim=0)
+            normalized_row = row
             if group_names[j] in result.keys():
                 result[group_names[j]] += normalized_row
             else:
@@ -92,16 +99,16 @@ def predict(model, dataloader, embed: embedMethod, epoch, predict_logger):
     for key, value in result.items():
         _, index = value.max(0)
         result[key] = index
-    return result
+    return result, correct/total
 
 
 def evaluate_1(model, group_names, group_labels, dataloader, embed: embedMethod, epoch, predict_loger):
-    result = predict(model, dataloader, embed, epoch, predict_loger)
+    result, single_acc = predict(model, dataloader, embed, epoch, predict_loger)
     correct = 0
     for group_name, group_label in zip(group_names, group_labels):
         correct += result[group_name] == group_label
     acc = correct / len(group_labels)
-    return acc
+    return acc, single_acc
 
 
 # save model

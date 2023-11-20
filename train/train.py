@@ -119,9 +119,9 @@ for epoch in range(epoches):
         scheduler.step()
         model.eval()
         with torch.no_grad():
-            acc = evaluate_1(model, group_names,group_labels, val_dataloader, embed, epoch,  predict_logger)
-            print(f"Validation Epoch {epoch + 1}/{30}, Accuracy: {acc:.8f}")
-        running_logger.info(f"Epoch: {epoch + 1}, Running Loss: {train_loss:.8f}, acc: {acc:.8f}")
+            acc, single_acc = evaluate_1(model, group_names,group_labels, val_dataloader, embed, epoch,  predict_logger)
+            print(f"Validation Epoch {epoch + 1}/{epoches}, Accuracy: {acc:.8f}, Single Accuracy:{single_acc:.8f}")
+        running_logger.info(f"Epoch: {epoch + 1}, Running Loss: {train_loss:.8f}, acc: {acc:.8f}, Single Accuracy:{single_acc:.8f}")
 
     # 如果验证正确率高于当前最佳正确率，则保存模型参数
     if acc > best_acc:
