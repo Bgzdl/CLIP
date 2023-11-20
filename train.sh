@@ -1,6 +1,6 @@
 #!/bin/bash
 
-model='LoRA'
+model='LoRA' # ['Adapter', 'LoRA', 'Prompt_LoRA', 'Resnet']
 path='./data' # '/root/autodl-tmp/patch' in autodl
 epoches='30'
 batch_size='32'

@@ -13,6 +13,7 @@ import clip
 from clip.LoRA import LoRA_CLIP, embedMethod
 from clip.Adapter import Adapter_CLIP
 from clip.Prompt_LoRA import VPT_LoRA_CLIP
+from clip.Resnet import Resnet_CLIP
 from function import train, evaluate, save_model, evaluate_1
 from dataset.dataset import Patch, Patch_Dataset
 from loss.InfoNCE import InfoNCE_loss
@@ -46,6 +47,8 @@ elif Optimization == 'LoRA':
     model = LoRA_CLIP(embed, model_name)
 elif Optimization == 'Prompt_LoRA':
     model = VPT_LoRA_CLIP(embed, model_name, 1)
+elif Optimization == 'Resnet':
+    model = Resnet_CLIP(embed, model_name)
 else:
     raise Exception("unknown model name ")
 print('model is ', Optimization)
