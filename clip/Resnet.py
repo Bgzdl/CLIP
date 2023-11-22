@@ -24,11 +24,15 @@ class Resnet_CLIP(nn.Module):
     def __init__(self, embed: embedMethod, model_name):
         super().__init__()
         self.embed = embed
-        self.origin_model = clip.load(model_name)
+        self.origin_model, _ = clip.load(model_name)
+        self.name = model_name
         for param in self.origin_model.parameters():
             param.requires_grad = False
         self.visual = models.resnet152(pretrained=True)
-        self.visual.fc = torch.nn.Linear(self.visual.fc.in_features, 768)
+        if self.name == 'ViT-B/16':
+            self.visual.fc = torch.nn.Linear(self.visual.fc.in_features, 512)
+        elif self.name == 'ViT-L/14':
+            self.visual.fc = torch.nn.Linear(self.visual.fc.in_features, 768)
         self.Biobert = bert_token_embedding(self.name)
         for param in self.Biobert.parameters():
             param.requires_grad = False
