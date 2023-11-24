@@ -78,3 +78,60 @@ class maskedInfoNCE_Loss(nn.Module):
         N = logits_per_image.size(0)
         loss = loss / N
         return loss
+
+
+class ContrastiveLoss(nn.Module):
+    def __init__(self, temperature=1.0):
+        super(ContrastiveLoss, self).__init__()
+        self.temperature = temperature
+
+    def forward(self, similarity_matrix, labels):
+        """
+        Calculate contrastive loss with false negatives attraction.
+
+        Args:
+            similarity_matrix: A matrix of shape (N, N) where N is the number of samples.
+                               similarity_matrix[i][j] represents sim(zi, zj).
+            false_negative_masks: A boolean tensor of shape (N, N) where false_negative_masks[i][j]
+                                  is True if zj is a false negative of zi.
+
+        Returns:
+            A scalar loss value.
+        """
+        false_negative_masks = ContrastiveLoss.get_false_negative_mask(labels)
+        false_negative_masks = 0.5 * false_negative_masks
+        N = similarity_matrix.size(0)
+        exp_sim = torch.exp(similarity_matrix / self.temperature)
+
+        # Create a mask to zero-out self-similarities along the diagonal
+        diagonal_mask = torch.eye(N, device=similarity_matrix.device).bool()
+
+        # Set diagonal and true negatives to a very small value before applying the mask
+        exp_sim.masked_fill_(diagonal_mask, 0)
+        exp_sim.masked_fill_(false_negative_masks, 0)
+
+        # Calculate the log probabilities
+        log_prob = similarity_matrix - torch.log(exp_sim.sum(dim=1, keepdim=True))
+
+        # Calculate the loss for each anchor excluding false negatives
+        loss_normal = -log_prob.diagonal().mean()
+
+        # Now calculate the loss where false negatives are treated as positives
+        fn_exp_sim = torch.exp(similarity_matrix / self.temperature)  # Recalculate without zeroing out false negatives
+        fn_log_prob = similarity_matrix - torch.log(fn_exp_sim.sum(dim=1, keepdim=True))
+
+        # Apply the mask for false negatives and calculate the loss
+        fn_loss = -torch.sum(fn_log_prob * false_negative_masks.float(), dim=1)
+
+        # Average the loss across all anchors and normalize by the count of false negatives + 1
+        fn_count = false_negative_masks.float().sum(dim=1) + 1  # +1 to avoid division by zero
+        loss_false_negatives = torch.sum(fn_loss / fn_count) / N
+
+        # Combine the normal loss and the false negative loss
+        total_loss = (loss_normal + loss_false_negatives) / 2
+
+        return total_loss
+
+    @staticmethod
+    def get_false_negative_mask(labels):
+        return torch.tensor(~get_mask(labels) - np.eye(len(labels)))

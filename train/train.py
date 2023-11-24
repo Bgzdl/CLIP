@@ -15,7 +15,7 @@ from clip.Adapter import Adapter_CLIP
 from clip.Prompt_LoRA import VPT_LoRA_CLIP
 from function import train, evaluate, save_model, evaluate_1
 from dataset.dataset import Patch, Patch_Dataset
-from loss.InfoNCE import CrossEntropyLoss, maskedInfoNCE_Loss, Probability_Loss
+from loss.InfoNCE import CrossEntropyLoss, maskedInfoNCE_Loss, Probability_Loss, ContrastiveLoss
 from parse.parser import parser
 
 # 设备准备
@@ -61,6 +61,7 @@ if torch.cuda.device_count() > 1:
 CrossEntropyLoss = CrossEntropyLoss(temperature).cuda()
 infoNCE_loss = maskedInfoNCE_Loss(temperature).cuda()
 probabilityLoss = Probability_Loss(temperature).cuda()
+FNCL = ContrastiveLoss(temperature)
 
 # 数据集
 '''
