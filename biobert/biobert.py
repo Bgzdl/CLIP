@@ -32,10 +32,4 @@ class bert_token_embedding(nn.Module):
         attention_mask = torch.ones(text.shape, dtype=torch.long).cuda()
         outputs = self.bert_model(text, attention_mask=attention_mask)
         x = outputs[0]
-        if self.name == 'ViT-B/16':
-            x = self.adaptive_layer(x)
-        elif self.name == 'ViT-L/14':
-            pass
-        else:
-            raise Exception('model name error')
         return x

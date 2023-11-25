@@ -69,6 +69,7 @@ class maskedInfoNCE_Loss(nn.Module):
         self.t = t
 
     def forward(self, logits_per_image, labels):
+        logits_per_image = logits_per_image * np.exp(self.t)
         logits_per_image = torch.softmax(logits_per_image, dim=1)
         mask = get_mask(labels).to(logits_per_image.device)
         diagonal_loss = torch.log(logits_per_image.diagonal())
@@ -83,11 +84,11 @@ class maskedInfoNCE_Loss(nn.Module):
 class ContrastiveLoss(nn.Module):
     def __init__(self, temperature=1.0):
         super(ContrastiveLoss, self).__init__()
-        self.temperature = temperature
+        self.temperature = torch.tensor(temperature)
 
     def forward(self, similarity_matrix, labels):
         """
-        Calculate contrastive loss with false negatives attraction.
+        Calculate custom contrastive loss with false negatives attraction.
 
         Args:
             similarity_matrix: A matrix of shape (N, N) where N is the number of samples.
@@ -98,40 +99,43 @@ class ContrastiveLoss(nn.Module):
         Returns:
             A scalar loss value.
         """
-        false_negative_masks = ContrastiveLoss.get_false_negative_mask(labels)
-        false_negative_masks = 0.5 * false_negative_masks
+        false_negative_masks = ContrastiveLoss.get_false_negative_mask(labels).bool().to(similarity_matrix.device)
         N = similarity_matrix.size(0)
-        exp_sim = torch.exp(similarity_matrix / self.temperature)
+        temp_exp = torch.exp(self.temperature)
+        modified_sim = similarity_matrix * temp_exp
 
         # Create a mask to zero-out self-similarities along the diagonal
         diagonal_mask = torch.eye(N, device=similarity_matrix.device).bool()
 
-        # Set diagonal and true negatives to a very small value before applying the mask
+        # Calculate the softmax denominator for normal and false negatives
+        exp_sim = torch.exp(modified_sim)
         exp_sim.masked_fill_(diagonal_mask, 0)
-        exp_sim.masked_fill_(false_negative_masks, 0)
 
-        # Calculate the log probabilities
-        log_prob = similarity_matrix - torch.log(exp_sim.sum(dim=1, keepdim=True))
+        softmax_denominator = exp_sim.sum(dim=1, keepdim=True)
 
-        # Calculate the loss for each anchor excluding false negatives
-        loss_normal = -log_prob.diagonal().mean()
+        # Calculate the log probabilities for normal samples
+        log_probs_normal = modified_sim - torch.log(softmax_denominator)
 
-        # Now calculate the loss where false negatives are treated as positives
-        fn_exp_sim = torch.exp(similarity_matrix / self.temperature)  # Recalculate without zeroing out false negatives
-        fn_log_prob = similarity_matrix - torch.log(fn_exp_sim.sum(dim=1, keepdim=True))
+        # Calculate the log probabilities for false negatives
+        fn_softmax_denominator = exp_sim.clone()
+        fn_softmax_denominator.masked_fill_(false_negative_masks, 0)
+        fn_softmax_denominator = fn_softmax_denominator.sum(dim=1, keepdim=True)
+        log_probs_fn = modified_sim - torch.log(fn_softmax_denominator)
 
-        # Apply the mask for false negatives and calculate the loss
-        fn_loss = -torch.sum(fn_log_prob * false_negative_masks.float(), dim=1)
-
-        # Average the loss across all anchors and normalize by the count of false negatives + 1
-        fn_count = false_negative_masks.float().sum(dim=1) + 1  # +1 to avoid division by zero
+        # Calculate the loss for normal and false negatives
+        loss_normal = -log_probs_normal.diagonal().mean()
+        fn_loss = -torch.sum(log_probs_fn * false_negative_masks.float(), dim=1)
+        fn_count = false_negative_masks.float().sum(dim=1) + 1
         loss_false_negatives = torch.sum(fn_loss / fn_count) / N
 
-        # Combine the normal loss and the false negative loss
+        # Combine the losses
         total_loss = (loss_normal + loss_false_negatives) / 2
 
         return total_loss
 
     @staticmethod
     def get_false_negative_mask(labels):
-        return torch.tensor(~get_mask(labels) - np.eye(len(labels)))
+        mask = get_mask(labels).float()  # 将布尔张量转换为浮点张量
+        identity_matrix = torch.eye(len(labels), device=mask.device)  # 创建单位矩阵
+        false_negative_mask = identity_matrix - mask  # 执行减法操作
+        return false_negative_mask

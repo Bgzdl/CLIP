@@ -61,7 +61,7 @@ if torch.cuda.device_count() > 1:
 CrossEntropyLoss = CrossEntropyLoss(temperature).cuda()
 infoNCE_loss = maskedInfoNCE_Loss(temperature).cuda()
 probabilityLoss = Probability_Loss(temperature).cuda()
-FNCL = ContrastiveLoss(temperature)
+FNCL = ContrastiveLoss(temperature).cuda()
 
 # 数据集
 '''
