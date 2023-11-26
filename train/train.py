@@ -58,7 +58,7 @@ if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model)
 
 # loss
-CrossEntropyLoss = CrossEntropyLoss(temperature).cuda()
+CrossEntropyLoss = CrossEntropyLoss(temperature, True).cuda()
 infoNCE_loss = maskedInfoNCE_Loss(temperature).cuda()
 probabilityLoss = Probability_Loss(temperature).cuda()
 FNCL = ContrastiveLoss(temperature).cuda()
@@ -113,7 +113,7 @@ running_logger.addHandler(logging.FileHandler(running_path, mode='w'))  # 将日
 # 训练过程
 for epoch in range(epoches):
     torch.cuda.empty_cache()
-    loss_function = probabilityLoss
+    loss_function = CrossEntropyLoss
     with torch.autocast("cuda"):
         model.train()
         train_loss = train(model, train_dataloader, loss_function, optimizer, model.embed, epoch, train_logger)

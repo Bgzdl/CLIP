@@ -4,14 +4,18 @@ import torch.nn as nn
 
 
 class CrossEntropyLoss(nn.Module):
-    def __init__(self, t):
+    def __init__(self, t, weight: bool = False):
         super(CrossEntropyLoss, self).__init__()
+        self.weight = weight
         self.t = t
 
     def forward(self, similarity, labels):
         criterion = nn.CrossEntropyLoss()
         similarity = similarity * np.exp(self.t)
-        similarity = similarity + 1e-6
+        similarity = similarity + 1e-9
+        if self.weight:
+            mask = get_weight(similarity, 1)
+            similarity = mask * similarity
         loss = criterion(similarity.T, labels)
         return loss
 
@@ -45,6 +49,32 @@ def get_mask(labels: np.array):
                 else:
                     mask[i, j] = 1
     return torch.from_numpy(mask)
+
+
+def get_weight(similarity_matrix, delta):
+    # 假定n是样本的数量，similarity_matrix是一个n*n的相似度矩阵
+    # 其中对角线元素similarity_matrix[i,i]表示第i个样本与自身的相似度，也就是正样本的相似度
+    n = similarity_matrix.shape[0]  # 示例，实际中n应该是相似度矩阵的维度
+    epsilon = 1e-9  # 防止除以0
+
+    # 创建mask矩阵，初始化为0
+    mask = np.eye(n)
+
+    # 对每一行，除了对角线上的正样本，计算其他负样本的权重
+    for i in range(n):
+        # 提取第i个样本的所有负样本相似度
+        negative_similarities = np.concatenate((similarity_matrix[i, :i], similarity_matrix[i, i + 1:]))
+        # 计算权重
+        weights = 1 / (negative_similarities + epsilon)
+        # 应用缩放因子
+        weights *= delta
+        # 归一化权重
+        weights /= np.sum(weights)
+        # 将权重分配到mask矩阵的相应位置
+        mask[i, :i] = weights[:i]
+        mask[i, i + 1:] = weights[i:]
+
+    return mask  # 返回最终的mask矩阵
 
 
 class Probability_Loss(nn.Module):
