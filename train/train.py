@@ -36,7 +36,7 @@ best_acc = 0.0
 best_epoch = 0
 
 # 模型准备
-model_name = 'ViT-L/14'  # ['ViT-B/16', 'ViT-L/14']
+model_name = 'ViT-B/16'  # ['ViT-B/16', 'ViT-L/14']
 _, transform = clip.load(model_name)
 print(model_name)
 embed = embedMethod.bio_bert

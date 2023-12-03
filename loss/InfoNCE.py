@@ -1,22 +1,26 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from scipy.special import softmax
 
 
 class CrossEntropyLoss(nn.Module):
     def __init__(self, t, weight: bool = False):
         super(CrossEntropyLoss, self).__init__()
+        self.criterion = nn.CrossEntropyLoss()
         self.weight = weight
         self.t = t
 
     def forward(self, similarity, labels):
-        criterion = nn.CrossEntropyLoss()
         similarity = similarity * np.exp(self.t)
-        similarity = similarity + 1e-9
+        if torch.isnan(similarity).any():
+            raise Exception("similarity has nan!!!")
         if self.weight:
-            mask = get_weight(similarity, 1)
+            mask = get_weight(similarity.clone().detach().cpu(), 0.5)
+            mask = torch.tensor(mask).to(similarity.device)
             similarity = mask * similarity
-        loss = criterion(similarity.T, labels)
+        labels = labels.to(similarity.device)
+        loss = self.criterion(similarity.T, labels)
         return loss
 
 
@@ -57,14 +61,19 @@ def get_weight(similarity_matrix, delta):
     n = similarity_matrix.shape[0]  # 示例，实际中n应该是相似度矩阵的维度
     epsilon = 1e-9  # 防止除以0
 
-    # 创建mask矩阵，初始化为0
+    # 创建mask矩阵，初始化为I
     mask = np.eye(n)
 
+    if np.isnan(similarity_matrix).any():
+        raise Exception("similarity_matrix has nan!!!")
     # 对每一行，除了对角线上的正样本，计算其他负样本的权重
     for i in range(n):
         # 提取第i个样本的所有负样本相似度
+
         negative_similarities = np.concatenate((similarity_matrix[i, :i], similarity_matrix[i, i + 1:]))
         # 计算权重
+        if np.isnan(negative_similarities).any():
+            raise Exception("negative_similarities has nan!!!")
         weights = 1 / (negative_similarities + epsilon)
         # 应用缩放因子
         weights *= delta
@@ -95,7 +104,6 @@ class Probability_Loss(nn.Module):
 class maskedInfoNCE_Loss(nn.Module):
     def __init__(self, t):
         super(maskedInfoNCE_Loss, self).__init__()
-        self.softmax = nn.Softmax(dim=1)
         self.t = t
 
     def forward(self, logits_per_image, labels):
@@ -112,8 +120,9 @@ class maskedInfoNCE_Loss(nn.Module):
 
 
 class ContrastiveLoss(nn.Module):
-    def __init__(self, temperature=1.0):
+    def __init__(self, temperature=1.0, weight=1.0):
         super(ContrastiveLoss, self).__init__()
+        self.weight = weight
         self.temperature = torch.tensor(temperature)
 
     def forward(self, similarity_matrix, labels):
@@ -129,43 +138,22 @@ class ContrastiveLoss(nn.Module):
         Returns:
             A scalar loss value.
         """
-        false_negative_masks = ContrastiveLoss.get_false_negative_mask(labels).bool().to(similarity_matrix.device)
+        false_negative_masks = ContrastiveLoss.get_false_negative_mask(labels).to(similarity_matrix.device)
         N = similarity_matrix.size(0)
-        temp_exp = torch.exp(self.temperature)
-        modified_sim = similarity_matrix * temp_exp
+        temp_exp = np.exp(self.temperature)
+        f = nn.LogSoftmax(dim=1)
+        modified_sim = f(similarity_matrix * temp_exp)
 
-        # Create a mask to zero-out self-similarities along the diagonal
-        diagonal_mask = torch.eye(N, device=similarity_matrix.device).bool()
+        diagonal_loss = torch.sum(modified_sim * torch.eye(modified_sim.shape))
 
-        # Calculate the softmax denominator for normal and false negatives
-        exp_sim = torch.exp(modified_sim)
-        exp_sim.masked_fill_(diagonal_mask, 0)
+        fn_loss = torch.sum(modified_sim * false_negative_masks)
 
-        softmax_denominator = exp_sim.sum(dim=1, keepdim=True)
-
-        # Calculate the log probabilities for normal samples
-        log_probs_normal = modified_sim - torch.log(softmax_denominator)
-
-        # Calculate the log probabilities for false negatives
-        fn_softmax_denominator = exp_sim.clone()
-        fn_softmax_denominator.masked_fill_(false_negative_masks, 0)
-        fn_softmax_denominator = fn_softmax_denominator.sum(dim=1, keepdim=True)
-        log_probs_fn = modified_sim - torch.log(fn_softmax_denominator)
-
-        # Calculate the loss for normal and false negatives
-        loss_normal = -log_probs_normal.diagonal().mean()
-        fn_loss = -torch.sum(log_probs_fn * false_negative_masks.float(), dim=1)
-        fn_count = false_negative_masks.float().sum(dim=1) + 1
-        loss_false_negatives = torch.sum(fn_loss / fn_count) / N
-
-        # Combine the losses
-        total_loss = (loss_normal + loss_false_negatives) / 2
+        total_loss = (diagonal_loss + self.weight * fn_loss)/N
 
         return total_loss
 
     @staticmethod
     def get_false_negative_mask(labels):
-        mask = get_mask(labels).float()  # 将布尔张量转换为浮点张量
-        identity_matrix = torch.eye(len(labels), device=mask.device)  # 创建单位矩阵
-        false_negative_mask = identity_matrix - mask  # 执行减法操作
-        return false_negative_mask
+        mask = get_mask(labels)
+        false_negative_mask = ~mask-np.eye(len(mask))
+        return torch.tensor(false_negative_mask).bool()
