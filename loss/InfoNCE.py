@@ -122,7 +122,7 @@ class maskedInfoNCE_Loss(nn.Module):
 class ContrastiveLoss(nn.Module):
     def __init__(self, temperature=1.0, weight=1.0):
         super(ContrastiveLoss, self).__init__()
-        self.weight = weight
+        self.weight = nn.Parameter(torch.tensor([weight]))
         self.temperature = torch.tensor(temperature)
 
     def forward(self, similarity_matrix, labels):
@@ -138,17 +138,21 @@ class ContrastiveLoss(nn.Module):
         Returns:
             A scalar loss value.
         """
+        self.weight = self.weight.to(similarity_matrix.device)
         false_negative_masks = ContrastiveLoss.get_false_negative_mask(labels).to(similarity_matrix.device)
         N = similarity_matrix.size(0)
         temp_exp = np.exp(self.temperature)
         f = nn.LogSoftmax(dim=1)
         modified_sim = f(similarity_matrix * temp_exp)
+        weight = torch.sum(false_negative_masks, dim=1).float().view(-1, 1)
+        weight = weight + 1
+        modified_sim = modified_sim / weight
 
-        diagonal_loss = torch.sum(modified_sim * torch.eye(modified_sim.shape))
+        diagonal_loss = torch.sum(modified_sim * torch.eye(N).to(similarity_matrix.device))
 
         fn_loss = torch.sum(modified_sim * false_negative_masks)
 
-        total_loss = (diagonal_loss + self.weight * fn_loss)/N
+        total_loss = -(diagonal_loss + self.weight * fn_loss) / N
 
         return total_loss
 

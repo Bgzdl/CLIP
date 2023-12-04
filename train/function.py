@@ -6,6 +6,7 @@ import os
 import clip
 from clip.LoRA import embedMethod
 from biobert.biobert import bert
+from loss.InfoNCE import ContrastiveLoss
 
 
 # train
@@ -22,7 +23,11 @@ def train(model, dataloader, criterion, optimizer, embed, epoch, train_logger):
         else:
             raise Exception("Val Token Error")
         logits_per_image, _ = model(I, T)
-        loss = criterion(logits_per_image, label)
+        if isinstance(criterion, ContrastiveLoss):
+            Segmentation_label = get_label(dictionary['target'])
+            loss = criterion(logits_per_image, Segmentation_label)
+        else:
+            loss = criterion(logits_per_image, label)
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
@@ -90,7 +95,7 @@ def predict(model, dataloader, embed: embedMethod, epoch, predict_logger):
     for key, value in result.items():
         _, index = value.max(0)
         result[key] = index
-    return result, correct/total
+    return result, correct / total
 
 
 def evaluate_1(model, group_names, group_labels, dataloader, embed: embedMethod, epoch, predict_loger):
@@ -112,3 +117,17 @@ def save_model(model, path, acc):
     acc_file = os.path.join(path, 'acc.txt')
     with open(acc_file, "w") as f:
         f.write(f"Accuracy is {acc}")
+
+
+# get label
+def get_label(T: list):
+    text_to_int = {}
+    current_int = 0
+
+    # 生成映射
+    for text in T:
+        if text not in text_to_int:
+            text_to_int[text] = current_int
+            current_int += 1
+    int_array = torch.tensor([text_to_int[text] for text in T])
+    return int_array
