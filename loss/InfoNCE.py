@@ -125,7 +125,7 @@ class ContrastiveLoss(nn.Module):
         self.weight = nn.Parameter(torch.tensor([weight]))
         self.temperature = torch.tensor(temperature)
 
-    def forward(self, similarity_matrix, labels):
+    def forward(self, similarity_matrix, T_mask, F_mask):
         """
         Calculate custom contrastive loss with false negatives attraction.
 
@@ -138,22 +138,26 @@ class ContrastiveLoss(nn.Module):
         Returns:
             A scalar loss value.
         """
-        self.weight = self.weight.to(similarity_matrix.device)
-        false_negative_masks = ContrastiveLoss.get_false_negative_mask(labels).to(similarity_matrix.device)
-        N = similarity_matrix.size(0)
-        temp_exp = np.exp(self.temperature)
-        f = nn.LogSoftmax(dim=1)
-        modified_sim = f(similarity_matrix * temp_exp)
-        weight = torch.sum(false_negative_masks, dim=1).float().view(-1, 1)
-        weight = weight + 1
-        modified_sim = modified_sim / weight
+        # 获取每行中有多少True false negative，并且加上正样本数量，最终获得权重
+        device = similarity_matrix.device
+        T_mask, F_mask = T_mask.to(device), F_mask.to(device)
+        weight = torch.sum(T_mask, dim=1) + 1
+        weight = weight.view(-1, 1)
 
-        diagonal_loss = torch.sum(modified_sim * torch.eye(N).to(similarity_matrix.device))
+        # 计算loss
+        similarity_matrix = similarity_matrix * np.exp(self.temperature)
+        similarity_matrix = torch.exp(similarity_matrix)
 
-        fn_loss = torch.sum(modified_sim * false_negative_masks)
+        fraction = torch.sum(F_mask * similarity_matrix, dim=1)
+        fraction = fraction.view(-1, 1)
+        similarity_matrix = similarity_matrix / fraction
 
-        total_loss = -(diagonal_loss + self.weight * fn_loss) / N
+        diagonal_mask = torch.eye(similarity_matrix.shape[0]).to(device)
+        diagonal_loss = torch.log(torch.sum(diagonal_mask * similarity_matrix, dim=1))
 
+        fn_loss = torch.sum(T_mask * similarity_matrix, dim=1)
+
+        total_loss = (diagonal_loss + self.weight * fn_loss) / weight
         return total_loss
 
     @staticmethod

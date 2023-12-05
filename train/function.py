@@ -24,8 +24,8 @@ def train(model, dataloader, criterion, optimizer, embed, epoch, train_logger):
             raise Exception("Val Token Error")
         logits_per_image, _ = model(I, T)
         if isinstance(criterion, ContrastiveLoss):
-            Segmentation_label = get_label(dictionary['target'])
-            loss = criterion(logits_per_image, Segmentation_label)
+            T_mask, F_mask = get_mask(label, dictionary['target'])
+            loss = criterion(logits_per_image, T_mask, F_mask)
         else:
             loss = criterion(logits_per_image, label)
         loss.backward()
@@ -119,8 +119,8 @@ def save_model(model, path, acc):
         f.write(f"Accuracy is {acc}")
 
 
-# get label
-def get_label(T: list):
+# get True false negative mask
+def get_T_mask(T: list):
     text_to_int = {}
     current_int = 0
 
@@ -129,5 +129,25 @@ def get_label(T: list):
         if text not in text_to_int:
             text_to_int[text] = current_int
             current_int += 1
-    int_array = torch.tensor([text_to_int[text] for text in T])
+    int_array = torch.tensor([text_to_int[text] for text in T]).bool()
     return int_array
+
+
+# get True and Fake false negative mask
+def get_mask(label: list, T: list):
+    length = len(label)
+    # negative mask
+    mask = np.zeros((length, length), dtype=bool)
+    for i in range(length):
+        for j in range(length):
+            if i == j:
+                mask[i, j] = 0
+            else:
+                if label[i] == label[j]:
+                    pass
+                else:
+                    mask[i, j] = 1
+    mask = torch.from_numpy(mask)
+    T_mask = get_T_mask(T)
+    F_mask = mask - T_mask
+    return T_mask, F_mask
