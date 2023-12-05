@@ -123,14 +123,21 @@ def save_model(model, path, acc):
 def get_T_mask(T: list):
     text_to_int = {}
     current_int = 0
-
+    N = len(T)
     # 生成映射
     for text in T:
         if text not in text_to_int:
             text_to_int[text] = current_int
             current_int += 1
-    int_array = torch.tensor([text_to_int[text] for text in T]).bool()
-    return int_array
+    int_array = torch.tensor([text_to_int[text] for text in T])
+    T_mask = torch.zeros((N, N)).bool()
+    for i in range(N):
+        for j in range(i+1, N):
+            if int_array[i] == int_array[j]:
+                T_mask[i, j] = True
+                T_mask[j, i] = True
+
+    return T_mask
 
 
 # get True and Fake false negative mask
@@ -149,5 +156,5 @@ def get_mask(label: list, T: list):
                     mask[i, j] = 1
     mask = torch.from_numpy(mask)
     T_mask = get_T_mask(T)
-    F_mask = mask - T_mask
+    F_mask = (mask.float() - T_mask.float()).bool()
     return T_mask, F_mask
