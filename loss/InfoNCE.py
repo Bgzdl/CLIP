@@ -139,6 +139,7 @@ class ContrastiveLoss(nn.Module):
             A scalar loss value.
         """
         # 获取每行中有多少True false negative，并且加上正样本数量，最终获得权重
+        N = similarity_matrix.shape[0]
         device = similarity_matrix.device
         T_mask, F_mask = T_mask.to(device), F_mask.to(device)
         weight = 1 / (torch.sum(T_mask, dim=1) + 1)
@@ -151,16 +152,13 @@ class ContrastiveLoss(nn.Module):
         fraction = torch.sum(~F_mask * similarity_matrix, dim=1)
         fraction = fraction.view(-1, 1)
         similarity_matrix = similarity_matrix / fraction
-        # Check the sum of each row must be 1
-        print(torch.max(torch.sum(~F_mask * similarity_matrix, dim=1)),
-              torch.min(torch.sum(~F_mask * similarity_matrix, dim=1)))
 
         diagonal_mask = torch.eye(similarity_matrix.shape[0]).to(device)
-        diagonal_loss = torch.sum(diagonal_mask * similarity_matrix, dim=1)
+        diagonal_loss = torch.log(torch.sum(diagonal_mask * similarity_matrix, dim=1))
 
-        fn_loss = torch.sum(T_mask * similarity_matrix, dim=1)
+        fn_loss = torch.sum(T_mask * torch.log(similarity_matrix), dim=1)
 
-        total_loss = torch.sum((diagonal_loss + self.weight * fn_loss).view(-1, 1) * weight)
+        total_loss = -torch.sum((diagonal_loss + self.weight * fn_loss).view(-1, 1) * weight) / N
         return total_loss
 
     @staticmethod

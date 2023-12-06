@@ -30,6 +30,7 @@ batch_size = args.batch_size
 temperature = args.temperature
 lr = args.learning_rate
 decayRate = args.decayRate
+shot_num = args.shot_num
 
 # 结果
 best_acc = 0.0
@@ -64,14 +65,7 @@ probabilityLoss = Probability_Loss(temperature).cuda()
 Contrastiveloss = ContrastiveLoss(temperature).cuda()
 
 # 数据集
-'''
-print('preparing dataset')
-dataset = Patch(path, label_type=False, transform=transform, load=False)
-count_0, count_1, count_2 = dataset.Count_the_number_of_various_tags()
-print('Quantity of various categories is', count_0, count_1, count_2)
-train_dataset, val_dataset, test_dataset = dataset.split()
-'''
-train_dataset = Patch_Dataset(path, 'train', load=False, transform=transform, seed=0)
+train_dataset = Patch_Dataset(path, 'train', load=False, transform=transform, seed=0, shot_num=shot_num)
 val_dataset = Patch_Dataset(path, 'val', load=False, transform=transform, seed=0)
 group_names, group_labels = val_dataset.get_ground_true()
 count_0, count_1, count_2 = train_dataset.Count_the_number_of_various_tags()

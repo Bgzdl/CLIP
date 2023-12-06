@@ -129,15 +129,16 @@ class Patch(Dataset):
 
 
 class Patch_Dataset(Dataset):
-    def __init__(self, path, mode='train', load=False, transform=None, seed=0):
+    def __init__(self, path, mode='train', load=False, transform=None, seed=0, shot_num=0):
         self.path = path
         self.load = load
         self.mode = mode
         self.seed = seed
         self.transform = transform
+        self.shot_num = shot_num
         group_names, group_labels, group_targets = self.get_split()
         self.group_length = len(group_names)
-        self.data, self.group_names, self.labels, self.targets, self.num_of_groups = self.load_data(group_names, group_labels, group_targets)
+        self.data, self.group_names, self.labels, self.targets, self.num_of_groups = self.load_data(group_names, group_labels, group_targets, shot_num)
         indices = list(range(len(self.data)))
         random.shuffle(indices)
         self.data = [self.data[i] for i in indices]
@@ -171,8 +172,6 @@ class Patch_Dataset(Dataset):
         for _, row in data_information.iterrows():
             text = row['subtype']
             if text in label_dict.keys():
-                if ',' in text:
-                    text = text.split(',')[0]
                 group_names.append(row['id'])
                 group_labels.append(label_dict[row['subtype']])
                 group_targets.append(row['text'])
@@ -190,13 +189,44 @@ class Patch_Dataset(Dataset):
         else:
             raise Exception('mode must be train or val')
 
-    def load_data(self, group_names, group_labels, group_targets):
+    def load_data(self, group_names, group_labels, group_targets, shot_num=0):
         data = []
         data_group_name = []
         num_of_group = dict()
         labels = []
         targets = []
+        data_information = []
         for group_name, group_label, group_target in zip(group_names, group_labels, group_targets):
+            imgs_path = os.path.join(self.path, 'new_dataset', group_name)
+            data_information.append((group_name, group_label, group_target, len(os.listdir(imgs_path))))
+        data_information = sorted(data_information, key=lambda x: x[3], reverse=True)
+        num_of_0 = 0
+        num_of_1 = 0
+        num_of_2 = 0
+        for information in data_information:
+            group_name, group_label, group_target = information[0], information[1], information[2]
+            if shot_num == 0:
+                pass
+            else:
+                if num_of_0 == shot_num and num_of_1 == shot_num and num_of_2 == shot_num:
+                    break
+                if group_label == 0:
+                    if num_of_0 == shot_num:
+                        continue
+                    else:
+                        num_of_0 += 1
+                elif group_label == 1:
+                    if num_of_1 == shot_num:
+                        continue
+                    else:
+                        num_of_1 += 1
+                elif group_label == 2:
+                    if num_of_2 == shot_num:
+                        continue
+                    else:
+                        num_of_2 += 1
+                else:
+                    raise Exception("Label Error")
             imgs_path = os.path.join(self.path, 'new_dataset', group_name)
             for img_name in os.listdir(imgs_path):
                 img_path = os.path.join(imgs_path, img_name)
