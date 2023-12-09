@@ -174,7 +174,9 @@ class Patch_Dataset(Dataset):
             if text in label_dict.keys():
                 group_names.append(row['id'])
                 group_labels.append(label_dict[row['subtype']])
-                group_targets.append(row['text'])
+                '''*************************************************************************************************'''
+                group_targets.append(row['subtype']) # row['text']
+                '''*************************************************************************************************'''
         indices = list(range(len(group_names)))
         random.shuffle(indices)
         group_names = [group_names[i] for i in indices]

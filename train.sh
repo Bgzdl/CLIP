@@ -10,6 +10,6 @@ decayRate='0.96'
 shot_num='0'
 python_script="./train/train.py"
 
-python "$python_script" "$model" "$path" "$epoches" "$batch_size" "$lr" "$temperature" "$decayRate" "shot_num"
+python "$python_script" "$model" "$path" "$epoches" "$batch_size" "$lr" "$temperature" "$decayRate" "$shot_num"
 
 shutdown -h now

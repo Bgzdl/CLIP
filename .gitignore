@@ -9,6 +9,9 @@ data/*
 biobert-base-cased-v1.2/
 model/*
 test.py
+few_shot_train.sh
+train/few_shot_train.py
+parse/few_shot_parser.py
 
 thumbs.db
 .DS_Store
